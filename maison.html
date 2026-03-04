@@ -1,0 +1,1175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MAISON NOIR — Luxury Fashion</title>
+<link rel="stylesheet" href="./fashion.css">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Montserrat:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+
+</head>
+<body class="cursor-custom">
+
+<!-- Custom cursors -->
+<div class="cursor" id="cursor"></div>
+<div class="cursor-ring" id="cursorRing"></div>
+
+<!-- Toast -->
+<div class="toast" id="toast"><span class="toast-gold">✓</span><span id="toastMsg"></span></div>
+
+<!-- Confirm delete modal -->
+<div class="confirm-overlay" id="confirmOverlay">
+  <div class="confirm-box">
+    <div class="confirm-icon">⚠️</div>
+    <h3 class="confirm-title">Delete Product?</h3>
+    <p class="confirm-text">This cannot be undone. The product will be permanently removed.</p>
+    <div class="confirm-actions">
+      <button class="btn-cancel" onclick="closeConfirm()">Cancel</button>
+      <button class="btn-del" id="confirmDelBtn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Product Modal -->
+<div class="modal-overlay" id="productModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2 class="modal-title" id="modalTitle">Add Product</h2>
+      <button class="modal-close" onclick="closeProductModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editProductId">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Product Name *</label><input class="form-input" id="pName" type="text" placeholder="e.g. Silk Evening Gown"></div>
+        <div class="form-group"><label class="form-label">Brand</label><input class="form-input" id="pBrand" type="text" placeholder="e.g. Maison Noir"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Category *</label><select class="form-select" id="pCategory"></select></div>
+        <div class="form-group"><label class="form-label">Tag</label><select class="form-select" id="pTag"><option value="">None</option><option value="new">New</option><option value="sale">Sale</option><option value="exclusive">Exclusive</option></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Price *</label><input class="form-input" id="pPrice" type="number" placeholder="1250"></div>
+        <div class="form-group"><label class="form-label">Original Price (sale)</label><input class="form-input" id="pOldPrice" type="number" placeholder="1800"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea" id="pDesc" placeholder="Short description…"></textarea></div>
+      <div class="form-group">
+        <label class="form-label">Product Image</label>
+        <div class="upload-area"><input type="file" accept="image/*" onchange="handleImgUpload(event)"><div class="upload-icon">🖼</div><div class="upload-text">Click or drag to upload</div><div style="font-size:9px;color:rgba(245,242,238,.18);margin-top:5px;">PNG, JPG, WEBP up to 5MB</div></div>
+        <img class="img-preview" id="imagePreview" alt=""><input type="hidden" id="pImageData">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Colors</label>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><div class="color-inputs" id="colorInputs"></div><button type="button" class="add-color-btn" onclick="addColorInput()">+ Color</button></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" style="display:flex;align-items:center;gap:10px;cursor:pointer;"><div class="toggle-sw on" id="pVisibleToggle" onclick="this.classList.toggle('on')"></div>Visible on Store</label>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-cancel" onclick="closeProductModal()">Cancel</button>
+      <button class="btn-save" onclick="saveProduct()">Save Product</button>
+    </div>
+  </div>
+</div>
+
+<!-- Cart drawer -->
+<div class="drawer-overlay" id="cartOverlay" onclick="closeCart()"></div>
+<div class="drawer" id="cartDrawer">
+  <div class="drawer-header"><h2 class="drawer-title">Your Cart</h2><button class="drawer-close" onclick="closeCart()">✕</button></div>
+  <div class="drawer-body" id="cartBody"></div>
+  <div id="cartFooter" style="display:none;">
+    <div class="drawer-footer">
+      <div class="cart-total-row"><span class="cart-total-label">Subtotal</span><span class="cart-total-val" id="cartTotal">€ 0</span></div>
+      <div class="cart-note">Shipping &amp; taxes calculated at checkout</div>
+      <button class="checkout-btn" onclick="handleCheckout()">Proceed to Checkout</button>
+      <span class="continue-link" onclick="closeCart()">← Continue Shopping</span>
+    </div>
+  </div>
+</div>
+
+<!-- Wishlist drawer -->
+<div class="drawer-overlay" id="wishlistOverlay" onclick="closeWishlist()"></div>
+<div class="drawer" id="wishlistDrawer">
+  <div class="drawer-header"><h2 class="drawer-title">Wishlist</h2><button class="drawer-close" onclick="closeWishlist()">✕</button></div>
+  <div class="drawer-body" id="wishlistBody"></div>
+</div>
+
+<!-- ══════════════════════════════════
+  SHOP VIEW
+══════════════════════════════════ -->
+<div class="view" id="shopView">
+  <!-- Hamburger for mobile sidebar -->
+  <button class="sb-hamburger" id="sbHamburger" aria-label="Menu"><span></span><span></span><span></span></button>
+  <div class="sb-overlay" id="sbOverlay" onclick="closeSidebar()"></div>
+
+  <!-- LEFT SIDEBAR -->
+  <aside class="shop-sidebar" id="shopSidebar">
+    <!-- Logo -->
+    <div class="sb-logo-area">
+      <span class="sb-logo" onclick="showView('shop')">MAISON NOIR</span>
+      <div class="sb-tagline">Luxury Fashion House</div>
+    </div>
+
+    <!-- Icon actions: search, wishlist, cart -->
+    <div class="sb-icons">
+      <button class="sb-icon-btn" onclick="showToast('Search coming soon')" title="Search">
+        <span>⌕</span><span class="sb-icon-label">Search</span>
+      </button>
+      <button class="sb-icon-btn" onclick="openWishlist()" title="Wishlist" id="wishIconBtn">
+        <span>♡</span>
+        <span class="sb-icon-label">Saved</span>
+        <span class="sb-badge" id="wishBadge">0</span>
+      </button>
+      <button class="sb-icon-btn" onclick="openCart()" title="Cart" id="cartIconBtn">
+        <span>⊕</span>
+        <span class="sb-icon-label">Cart</span>
+        <span class="sb-badge show" id="cartBadge">0</span>
+      </button>
+    </div>
+
+    <!-- Category navigation -->
+    <nav class="sb-nav">
+      <div class="sb-section-label">Shop</div>
+      <button class="sb-link active" id="cat-all" onclick="filterCat('all',this)"><span class="sb-link-icon">✦</span>All Products</button>
+      <div id="sidebarCatLinks"></div>
+
+      <div class="sb-section-label">Pages</div>
+      <button class="sb-link" onclick="document.getElementById('about-section')?.scrollIntoView({behavior:'smooth'});closeSidebar()"><span class="sb-link-icon">◈</span>Our Story</button>
+      <button class="sb-link" onclick="document.getElementById('testimonials-section')?.scrollIntoView({behavior:'smooth'});closeSidebar()"><span class="sb-link-icon">◉</span>Testimonials</button>
+    </nav>
+
+    <!-- Bottom: User area + Admin -->
+    <div class="sb-bottom">
+      <div class="sb-user-area" id="sbUserArea"></div>
+      <button class="sb-btn admin-btn" onclick="showView('adminLogin')">
+        <span>⚙</span> Admin Panel
+      </button>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="shop-main">
+    <!-- HERO -->
+    <section class="hero" id="hero-section">
+      <div class="hero-overlay"></div>
+      <div class="hero-deco"><div class="hero-letter">M</div></div>
+      <div class="hero-content">
+        <p class="hero-eyebrow">Spring / Summer 2026 Collection</p>
+        <h1 class="hero-title">Wear Your<br><em>Story</em></h1>
+        <p class="hero-desc">Where craftsmanship meets contemporary vision. Each piece a testament to artisans who shaped tomorrow's legacy from yesterday's traditions.</p>
+        <div class="hero-cta">
+          <button class="btn-gold" onclick="document.getElementById('catalogue').scrollIntoView({behavior:'smooth'})"><span>Explore Collection</span></button>
+          <button class="btn-ghost" onclick="document.getElementById('about-section').scrollIntoView({behavior:'smooth'})">Our Story</button>
+        </div>
+      </div>
+      <div class="hero-scroll"><div class="scroll-line"></div><span>Scroll</span></div>
+    </section>
+
+    <!-- MARQUEE -->
+    <div class="marquee-wrap" aria-hidden="true">
+      <div class="marquee-track">
+        <div class="marquee-item">New Arrivals <span class="mdot"></span></div>
+        <div class="marquee-item">SS 2026 Collection <span class="mdot"></span></div>
+        <div class="marquee-item">Free Shipping Over €300 <span class="mdot"></span></div>
+        <div class="marquee-item">Exclusive Members Access <span class="mdot"></span></div>
+        <div class="marquee-item">Handcrafted Luxury <span class="mdot"></span></div>
+        <div class="marquee-item">New Arrivals <span class="mdot"></span></div>
+        <div class="marquee-item">SS 2026 Collection <span class="mdot"></span></div>
+        <div class="marquee-item">Free Shipping Over €300 <span class="mdot"></span></div>
+        <div class="marquee-item">Exclusive Members Access <span class="mdot"></span></div>
+        <div class="marquee-item">Handcrafted Luxury <span class="mdot"></span></div>
+      </div>
+    </div>
+
+    <!-- CATALOGUE -->
+    <section class="cat-section section-pad" id="catalogue">
+      <div class="section-header reveal">
+        <div><p class="section-label">Our Catalogue</p><h2 class="section-title">Shop by <em>Collection</em></h2></div>
+        <button class="btn-ghost" onclick="filterCat('all',null)">View All</button>
+      </div>
+      <div class="products-grid" id="shopGrid"></div>
+    </section>
+
+    <!-- FEATURE BAND -->
+    <section class="feature-band" id="about-section">
+      <div class="feature-text reveal">
+        <p class="section-label" style="color:rgba(10,10,10,.5)"><span style="width:32px;height:1px;background:rgba(10,10,10,.4);display:inline-block;margin-right:12px;vertical-align:middle;"></span>Our Promise</p>
+        <h2 class="feature-title">Crafted with<br>Purpose &amp;<br>Precision</h2>
+        <p class="feature-desc">Every garment bearing the Maison Noir name is the result of hundreds of hours of dedicated craftsmanship, using only the finest materials sourced ethically worldwide.</p>
+        <button class="btn-dark"><span>Discover Our Craft</span></button>
+      </div>
+      <div class="feature-stats reveal">
+        <div class="stat-item"><div class="stat-number">40+</div><div class="stat-label">Years Heritage</div></div>
+        <div class="stat-item"><div class="stat-number">12</div><div class="stat-label">Global Ateliers</div></div>
+        <div class="stat-item"><div class="stat-number">100%</div><div class="stat-label">Ethical Sourcing</div></div>
+        <div class="stat-item"><div class="stat-number" id="totalPiecesStat">0</div><div class="stat-label">Unique Pieces</div></div>
+      </div>
+    </section>
+
+    <!-- TESTIMONIALS -->
+    <section class="testimonials" id="testimonials-section">
+      <div class="section-header reveal" style="justify-content:center;flex-direction:column;align-items:center;text-align:center;margin-bottom:48px;">
+        <p class="section-label" style="justify-content:center;">— Client Stories —</p>
+        <h2 class="section-title">What They <em>Say</em></h2>
+      </div>
+      <div style="overflow:hidden;" class="reveal">
+        <div class="testimonial-track" id="testimonialTrack">
+          <div class="testimonial-slide"><p class="testimonial-quote">Maison Noir doesn't just create fashion — they craft moments. The evening gown I wore to the Paris gala was the most exquisite thing I have ever owned.</p><p class="testimonial-author">— Isabelle Moreau, Paris</p></div>
+          <div class="testimonial-slide"><p class="testimonial-quote">The craftsmanship is unparalleled. Each stitch tells a story of dedication that I can feel every time I wear a Maison Noir piece. Truly transcendent design.</p><p class="testimonial-author">— Alexander Chen, London</p></div>
+          <div class="testimonial-slide"><p class="testimonial-quote">I have shopped at every major fashion house in the world, and nothing compares to the personal attention and extraordinary quality that Maison Noir delivers.</p><p class="testimonial-author">— Sofia Delacroix, Milan</p></div>
+        </div>
+        <div class="slider-controls">
+          <button class="slider-btn" onclick="prevSlide()">←</button>
+          <div class="slider-dots"><div class="slider-dot active"></div><div class="slider-dot"></div><div class="slider-dot"></div></div>
+          <button class="slider-btn" onclick="nextSlide()">→</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- NEWSLETTER -->
+    <section class="newsletter">
+      <p class="section-label reveal" style="justify-content:center;margin-bottom:12px;">Join The Circle</p>
+      <h2 class="nl-title reveal">Stay in <em style="font-family:'Cormorant Garamond',serif;font-style:italic;color:var(--gold)">Vogue</em></h2>
+      <p class="nl-sub reveal">Be first to discover new collections, exclusive events &amp; private sales.</p>
+      <form class="nl-form reveal" onsubmit="handleSubscribe(event)">
+        <input type="email" class="nl-input" placeholder="Your email address" required>
+        <button type="submit" class="nl-btn">Subscribe</button>
+      </form>
+    </section>
+
+    <!-- FOOTER -->
+    <footer>
+      <div class="footer-grid">
+        <div>
+          <div class="footer-logo">MAISON NOIR</div>
+          <p class="footer-desc">A house built on the belief that fashion is not merely clothing — it is the language through which we speak our most authentic selves.</p>
+          <div class="footer-social">
+            <a href="#" class="soc-link">ig</a><a href="#" class="soc-link">pt</a><a href="#" class="soc-link">tk</a><a href="#" class="soc-link">fb</a>
+          </div>
+        </div>
+        <div>
+          <h4 class="fc-title">Collections</h4>
+          <ul class="fc-links" id="footerCats"></ul>
+        </div>
+        <div>
+          <h4 class="fc-title">Services</h4>
+          <ul class="fc-links">
+            <li><a>Personal Styling</a></li><li><a>Bespoke Orders</a></li><li><a>Alterations</a></li><li><a>Gift Wrapping</a></li><li><a>Members Club</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="fc-title">Account</h4>
+          <ul class="fc-links">
+            <li><a onclick="handleAuthNav()">My Account</a></li>
+            <li><a onclick="openCart()">My Cart</a></li>
+            <li><a onclick="openWishlist()">My Wishlist</a></li>
+            <li><a>Track Order</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p class="footer-copy">© 2026 Maison Noir. All rights reserved.</p>
+        <ul class="footer-legal"><li><a>Privacy</a></li><li><a>Terms</a></li><li><a>Cookies</a></li></ul>
+      </div>
+    </footer>
+  </main>
+</div>
+
+<!-- ══════════════════════════════════
+  LOGIN VIEW
+══════════════════════════════════ -->
+<div class="view" id="loginView">
+  <div class="auth-wrap">
+    <div class="auth-logo">MAISON NOIR</div>
+    <div class="auth-sub">Sign In to Your Account</div>
+    <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="loginEmail" type="email" placeholder="your@email.com"></div>
+    <div class="form-group"><label class="form-label">Password</label><input class="form-input" id="loginPassword" type="password" placeholder="••••••••"></div>
+    <div class="auth-error" id="loginError">Invalid email or password.</div>
+    <button class="auth-btn" onclick="doUserLogin()">Sign In</button>
+    <div class="auth-switch">No account? <a onclick="showView('register')">Create one</a></div>
+    <span class="back-link" onclick="showView('shop')">← Back to Store</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+  REGISTER VIEW
+══════════════════════════════════ -->
+<div class="view" id="registerView">
+  <div class="auth-wrap">
+    <div class="auth-logo">MAISON NOIR</div>
+    <div class="auth-sub">Create Your Account</div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">First Name</label><input class="form-input" id="regFirst" type="text" placeholder="Isabella"></div>
+      <div class="form-group"><label class="form-label">Last Name</label><input class="form-input" id="regLast" type="text" placeholder="Moreau"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="regEmail" type="email" placeholder="your@email.com"></div>
+    <div class="form-group"><label class="form-label">Phone (optional)</label><input class="form-input" id="regPhone" type="tel" placeholder="+1 234 567 890"></div>
+    <div class="form-group">
+      <label class="form-label">Password</label>
+      <input class="form-input" id="regPassword" type="password" placeholder="At least 8 characters" oninput="checkPassStrength(this.value)">
+      <div class="pass-bar" id="passStrength"></div>
+    </div>
+    <div class="form-group"><label class="form-label">Confirm Password</label><input class="form-input" id="regConfirm" type="password" placeholder="Repeat password"></div>
+    <div class="auth-error" id="registerError"></div>
+    <button class="auth-btn" onclick="doRegister()">Create Account</button>
+    <div class="auth-switch">Have an account? <a onclick="showView('login')">Sign in</a></div>
+    <span class="back-link" onclick="showView('shop')">← Back to Store</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+  ADMIN LOGIN VIEW
+══════════════════════════════════ -->
+<div class="view" id="adminLoginView">
+  <div class="auth-wrap">
+    <div class="auth-logo">MAISON NOIR</div>
+    <div class="auth-sub">Admin Portal</div>
+    <div class="form-group"><label class="form-label">Username</label><input class="form-input" id="adminLoginUser" type="text" placeholder="admin"></div>
+    <div class="form-group"><label class="form-label">Password</label><input class="form-input" id="adminLoginPass" type="password" placeholder="••••••••"></div>
+    <div class="auth-error" id="adminLoginError">Invalid credentials.</div>
+    <button class="auth-btn" onclick="doAdminLogin()">Enter Admin Panel</button>
+    <span class="back-link" onclick="showView('shop')">← Back to Store</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+  PROFILE VIEW
+══════════════════════════════════ -->
+<div class="view" id="profileView">
+  <div class="profile-topbar">
+    <span class="profile-topbar-logo" onclick="showView('shop')">MAISON NOIR</span>
+    <div class="profile-topbar-actions">
+      <button class="sb-btn" style="width:auto;padding:8px 16px;" onclick="openCart()">⊕ Cart <span id="profileCartBadge">0</span></button>
+      <button class="sb-btn" style="width:auto;padding:8px 16px;" onclick="showView('shop')">← Store</button>
+      <button class="sb-btn danger" style="width:auto;padding:8px 16px;" onclick="doUserLogout()">Sign Out</button>
+    </div>
+  </div>
+  <div class="profile-container">
+    <div class="profile-header" id="profileHeader">
+      <div class="profile-avatar" id="profileAvatarLetter">U</div>
+      <div class="profile-header-info">
+        <div class="profile-name" id="profileFullName">—</div>
+        <div class="profile-email-disp" id="profileEmailDisp">—</div>
+        <div class="profile-since" id="profileSince">—</div>
+      </div>
+      <div class="profile-header-stats">
+        <div class="ph-stat"><div class="ph-stat-val" id="phOrders">0</div><div class="ph-stat-label">Orders</div></div>
+        <div class="ph-stat"><div class="ph-stat-val" id="phWish">0</div><div class="ph-stat-label">Wishlist</div></div>
+        <div class="ph-stat"><div class="ph-stat-val" id="phCart">0</div><div class="ph-stat-label">In Cart</div></div>
+      </div>
+    </div>
+    <div class="profile-tabs">
+      <button class="ptab active" onclick="showPTab('overview',this)">Overview</button>
+      <button class="ptab" onclick="showPTab('orders',this)">Orders</button>
+      <button class="ptab" onclick="showPTab('wishlist',this)">Wishlist</button>
+      <button class="ptab" onclick="showPTab('settings',this)">Account Settings</button>
+    </div>
+    <div class="psec active" id="ptab-overview">
+      <div class="pcard">
+        <h3 class="pcard-title">Personal Information</h3>
+        <div class="info-grid" id="profileInfoGrid"></div>
+      </div>
+      <div class="pcard">
+        <h3 class="pcard-title">Cart Summary</h3>
+        <div id="profileCartSummary"></div>
+        <button class="psave-btn" onclick="openCart()">Open Full Cart</button>
+      </div>
+    </div>
+    <div class="psec" id="ptab-orders">
+      <div class="pcard"><h3 class="pcard-title">Order History</h3><div id="profileOrdersList"></div></div>
+    </div>
+    <div class="psec" id="ptab-wishlist">
+      <div class="pcard"><h3 class="pcard-title">My Wishlist</h3><div class="wl-grid" id="profileWishGrid"></div></div>
+    </div>
+    <div class="psec" id="ptab-settings">
+      <div class="pcard">
+        <h3 class="pcard-title">Edit Profile</h3>
+        <div class="form-row"><div class="form-group"><label class="form-label">First Name</label><input class="form-input" id="editFirst" type="text"></div><div class="form-group"><label class="form-label">Last Name</label><input class="form-input" id="editLast" type="text"></div></div>
+        <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="editEmail" type="email"></div>
+        <div class="form-group"><label class="form-label">Phone</label><input class="form-input" id="editPhone" type="tel"></div>
+        <div class="form-group"><label class="form-label">Address</label><input class="form-input" id="editAddress" type="text" placeholder="123 Fashion Avenue"></div>
+        <div class="form-row"><div class="form-group"><label class="form-label">City</label><input class="form-input" id="editCity" type="text"></div><div class="form-group"><label class="form-label">Country</label><input class="form-input" id="editCountry" type="text"></div></div>
+        <button class="psave-btn" onclick="saveProfileSettings()">Save Changes</button>
+      </div>
+      <div class="pcard">
+        <h3 class="pcard-title">Change Password</h3>
+        <div class="form-group"><label class="form-label">Current Password</label><input class="form-input" id="curPw" type="password" placeholder="••••••••"></div>
+        <div class="form-group"><label class="form-label">New Password</label><input class="form-input" id="newPw" type="password" placeholder="••••••••"></div>
+        <div class="form-group"><label class="form-label">Confirm New</label><input class="form-input" id="cfPw" type="password" placeholder="••••••••"></div>
+        <button class="psave-btn" onclick="changePassword()">Update Password</button>
+      </div>
+      <div class="pcard">
+        <h3 class="pcard-title" style="color:var(--red);">Danger Zone</h3>
+        <p style="font-size:11px;color:rgba(245,242,238,.38);line-height:1.7;margin-bottom:14px;">Deleting your account is permanent and cannot be undone.</p>
+        <button class="danger-btn" onclick="deleteAccount()">Delete My Account</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+  ADMIN VIEW
+══════════════════════════════════ -->
+<div class="view" id="adminView">
+  <div class="admin-sb-overlay" id="adminSbOverlay" onclick="closeSidebarAdmin()"></div>
+  <aside class="admin-sb" id="adminSidebar">
+    <div class="admin-sb-logo">
+      <div class="admin-sb-title">MAISON NOIR</div>
+      <div class="admin-sb-sub">Admin Dashboard</div>
+    </div>
+    <nav class="admin-sb-nav">
+      <div class="admin-sb-sect">Main</div>
+      <div class="admin-nav-item active" onclick="showAdminSec('dashboard',this)"><span class="ni">◈</span>Dashboard</div>
+      <div class="admin-sb-sect">Catalogue</div>
+      <div class="admin-nav-item" onclick="showAdminSec('products',this)"><span class="ni">◻</span>Products<span class="admin-nb" id="navProdCount">0</span></div>
+      <div class="admin-nav-item" onclick="showAdminSec('categories',this)"><span class="ni">◈</span>Categories</div>
+      <div class="admin-sb-sect">Users</div>
+      <div class="admin-nav-item" onclick="showAdminSec('users',this)"><span class="ni">◉</span>Users<span class="admin-nb" id="navUserCount">0</span></div>
+      <div class="admin-sb-sect">System</div>
+      <div class="admin-nav-item" onclick="showAdminSec('settings',this)"><span class="ni">⚙</span>Settings</div>
+      <div class="admin-nav-item" onclick="showView('shop')"><span class="ni">◁</span>View Store</div>
+    </nav>
+    <div class="admin-sb-footer">
+      <div class="admin-user-row">
+        <div class="admin-av">A</div>
+        <div><div class="admin-uname" id="adminUserName">Admin</div><div class="admin-urole">Super Admin</div></div>
+      </div>
+      <button class="admin-logout-btn" onclick="doAdminLogout()">Sign Out</button>
+    </div>
+  </aside>
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div style="display:flex;align-items:center;gap:13px;">
+        <button class="admin-sb-toggle" onclick="toggleAdminSidebar()">☰</button>
+        <h1 class="admin-page-title" id="adminPageTitle">Dashboard <span>Overview</span></h1>
+      </div>
+      <div class="admin-topbar-btns">
+        <button class="admin-tbtn" onclick="showView('shop')">Preview Store ↗</button>
+        <button class="admin-tbtn gold" onclick="openProductModal()">+ Add Product</button>
+      </div>
+    </div>
+    <div class="admin-content">
+      <!-- Dashboard -->
+      <div class="admin-sec active" id="sec-dashboard">
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-card-lbl">Total Products</div><div class="stat-card-val" id="d-products">0</div><div class="stat-card-sub">In catalogue</div><div class="stat-card-ico">◻</div></div>
+          <div class="stat-card"><div class="stat-card-lbl">Registered Users</div><div class="stat-card-val" id="d-users">0</div><div class="stat-card-sub">Active members</div><div class="stat-card-ico">◉</div></div>
+          <div class="stat-card"><div class="stat-card-lbl">Categories</div><div class="stat-card-val" id="d-cats">0</div><div class="stat-card-sub">Collections</div><div class="stat-card-ico">◈</div></div>
+          <div class="stat-card"><div class="stat-card-lbl">Visible Products</div><div class="stat-card-val" id="d-visible">0</div><div class="stat-card-sub">Shown in store</div><div class="stat-card-ico">◉</div></div>
+        </div>
+        <div style="background:var(--dark);border:1px solid var(--border);padding:24px;">
+          <h3 style="font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:300;margin-bottom:16px;">Recent Products</h3>
+          <div id="recentProducts"></div>
+        </div>
+      </div>
+      <!-- Products -->
+      <div class="admin-sec" id="sec-products">
+        <div class="admin-toolbar">
+          <div class="admin-search"><span style="color:rgba(245,242,238,.28);font-size:13px;">⌕</span><input type="text" id="productSearch" placeholder="Search products…" oninput="renderProductsTable()"></div>
+          <button class="admin-tbtn gold" onclick="openProductModal()">+ Add Product</button>
+        </div>
+        <div class="cat-filter-bar" id="adminCatBar"></div>
+        <div style="overflow-x:auto;">
+          <table class="products-table">
+            <thead><tr><th>Image</th><th>Product</th><th>Category</th><th>Price</th><th>Tag</th><th>Visible</th><th>Actions</th></tr></thead>
+            <tbody id="productsTableBody"></tbody>
+          </table>
+        </div>
+        <div id="tableEmpty" style="text-align:center;padding:50px;color:rgba(245,242,238,.2);display:none;">
+          <p style="font-family:'Cormorant Garamond',serif;font-size:22px;font-style:italic;margin-bottom:6px;">No products yet</p>
+          <span style="font-size:9px;letter-spacing:.2em;text-transform:uppercase;">Click "+ Add Product" to get started</span>
+        </div>
+      </div>
+      <!-- Categories -->
+      <div class="admin-sec" id="sec-categories">
+        <div class="cats-grid" id="catsGrid"></div>
+        <div style="background:var(--dark);border:1px solid var(--border);padding:24px;">
+          <h3 style="font-family:'Cormorant Garamond',serif;font-size:19px;font-weight:300;margin-bottom:16px;">Add New Category</h3>
+          <div class="add-cat-form"><input class="form-input" id="newCatName" type="text" placeholder="e.g. Evening Wear, Shoes…"><button class="add-cat-btn" onclick="addCategory()">+ Add</button></div>
+        </div>
+      </div>
+      <!-- Users -->
+      <div class="admin-sec" id="sec-users">
+        <div style="overflow-x:auto;">
+          <table class="users-table">
+            <thead><tr><th></th><th>Name</th><th>Email</th><th>Phone</th><th>Joined</th><th>Cart</th><th>Wishlist</th></tr></thead>
+            <tbody id="usersTableBody"></tbody>
+          </table>
+        </div>
+        <div id="usersEmpty" style="text-align:center;padding:50px;color:rgba(245,242,238,.2);display:none;"><p style="font-family:'Cormorant Garamond',serif;font-size:22px;font-style:italic;">No registered users yet</p></div>
+      </div>
+      <!-- Settings -->
+      <div class="admin-sec" id="sec-settings">
+        <div class="settings-grid">
+          <div class="settings-card">
+            <h3 class="settings-card-title">Store Settings</h3>
+            <div class="form-group"><label class="form-label">Store Name</label><input class="form-input" id="setStoreName" type="text"></div>
+            <div class="form-group"><label class="form-label">Tagline</label><input class="form-input" id="setTagline" type="text"></div>
+            <div class="form-group"><label class="form-label">Currency</label><input class="form-input" id="setCurrency" type="text" maxlength="3" style="max-width:80px;"></div>
+            <div class="settings-row"><div><div class="settings-lbl">Show Out of Stock</div><div class="settings-sub">Display unavailable items</div></div><div class="toggle-sw on" id="toggleOOS" onclick="this.classList.toggle('on')"></div></div>
+            <button class="settings-save-btn" onclick="saveSettings()">Save Settings</button>
+          </div>
+          <div class="settings-card">
+            <h3 class="settings-card-title">Admin Account</h3>
+            <div class="form-group"><label class="form-label">Username</label><input class="form-input" id="setAdminUser" type="text"></div>
+            <div class="form-group"><label class="form-label">Current Password</label><input class="form-input" id="setCurrentPw" type="password" placeholder="••••••••"></div>
+            <div class="form-group"><label class="form-label">New Password</label><input class="form-input" id="setNewPw" type="password" placeholder="••••••••"></div>
+            <div class="form-group"><label class="form-label">Confirm New</label><input class="form-input" id="setConfirmPw" type="password" placeholder="••••••••"></div>
+            <button class="settings-save-btn" onclick="saveAdminAccount()">Update Account</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════
+   DATA LAYER
+═══════════════════════════════════════════ */
+const DB={get(k){try{return JSON.parse(localStorage.getItem('mn3_'+k));}catch{return null;}},set(k,v){localStorage.setItem('mn3_'+k,JSON.stringify(v));}};
+
+function initData(){
+  if(!DB.get('products')) DB.set('products',[
+    {id:'p1',name:'Silk Evening Gown',brand:'Maison Noir',category:'Women',price:2850,oldPrice:null,tag:'new',desc:'A timeless gown in pure silk.',image:'',colors:['#1a1a1a','#c9a96e','#8b7355'],visible:true},
+    {id:'p2',name:'Wool Blazer',brand:'Maison Noir',category:'Men',price:1490,oldPrice:1890,tag:'exclusive',desc:'Sharp tailoring in premium wool.',image:'',colors:['#0a1628','#2c2c2c'],visible:true},
+    {id:'p3',name:'Leather Tote Bag',brand:'Maison Noir',category:'Accessories',price:980,oldPrice:null,tag:'',desc:'Hand-stitched full-grain leather.',image:'',colors:['#c9a96e','#1a1a1a','#8b3a3a'],visible:true},
+    {id:'p4',name:'Velvet Midi Dress',brand:'Maison Noir',category:'Women',price:720,oldPrice:1200,tag:'sale',desc:'Luxurious velvet in deep jewel tones.',image:'',colors:['#6b2d4a','#1a1a2e'],visible:true},
+    {id:'p5',name:'Cashmere Scarf',brand:'Maison Noir',category:'Accessories',price:380,oldPrice:null,tag:'new',desc:'Pure Mongolian cashmere.',image:'',colors:['#c9a96e','#f5f2ee','#1a1a1a'],visible:true},
+    {id:'p6',name:'Tailored Trousers',brand:'Maison Noir',category:'Men',price:650,oldPrice:null,tag:'',desc:'Precision-cut in Italian wool-blend.',image:'',colors:['#1a1a1a','#2c2c2c'],visible:true},
+  ]);
+  if(!DB.get('categories')) DB.set('categories',['Women','Men','Accessories','Jewellery','Summer']);
+  if(!DB.get('adminCreds')) DB.set('adminCreds',{user:'admin',pass:'admin123'});
+  if(!DB.get('settings')) DB.set('settings',{storeName:'MAISON NOIR',tagline:'Luxury Fashion House',currency:'€'});
+  if(!DB.get('users')) DB.set('users',[]);
+}
+
+const getProducts=()=>DB.get('products')||[];
+const getCategories=()=>DB.get('categories')||[];
+const getSettings=()=>DB.get('settings')||{currency:'€'};
+const getAdminCreds=()=>DB.get('adminCreds')||{user:'admin',pass:'admin123'};
+const getUsers=()=>DB.get('users')||[];
+
+/* ═══════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════ */
+let currentUser=null, cart=[], wishlist=[], adminLoggedIn=false, activeCat='all', adminCatFilter='all';
+
+/* ═══════════════════════════════════════════
+   VIEW ROUTING
+═══════════════════════════════════════════ */
+function showView(v){
+  document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
+  document.getElementById(v+'View').classList.add('active');
+  window.scrollTo(0,0);
+  if(v==='shop'){renderShop();updateSbUserArea();}
+  if(v==='admin'){renderAdminPanel();}
+  if(v==='profile'){renderProfile();}
+}
+
+/* ═══════════════════════════════════════════
+   SIDEBAR
+═══════════════════════════════════════════ */
+function openSidebar(){document.getElementById('shopSidebar').classList.add('open');document.getElementById('sbOverlay').classList.add('show');document.getElementById('sbHamburger').classList.add('open');}
+function closeSidebar(){document.getElementById('shopSidebar').classList.remove('open');document.getElementById('sbOverlay').classList.remove('show');document.getElementById('sbHamburger').classList.remove('open');}
+document.getElementById('sbHamburger').addEventListener('click',()=>{
+  document.getElementById('shopSidebar').classList.contains('open')?closeSidebar():openSidebar();
+});
+
+/* ═══════════════════════════════════════════
+   USER AUTH
+═══════════════════════════════════════════ */
+function doUserLogin(){
+  const email=document.getElementById('loginEmail').value.trim().toLowerCase();
+  const pass=document.getElementById('loginPassword').value;
+  const user=getUsers().find(u=>u.email===email&&u.password===pass);
+  if(!user){document.getElementById('loginError').classList.add('show');return;}
+  document.getElementById('loginError').classList.remove('show');
+  currentUser=user; cart=user.cart||[]; wishlist=user.wishlist||[];
+  showView('shop');
+  showToast(`Welcome back, ${user.firstName}!`);
+  updateSbUserArea(); updateCartBadge(); updateWishBadge();
+}
+document.getElementById('loginPassword').addEventListener('keydown',e=>{if(e.key==='Enter')doUserLogin();});
+
+function doRegister(){
+  const first=document.getElementById('regFirst').value.trim();
+  const last=document.getElementById('regLast').value.trim();
+  const email=document.getElementById('regEmail').value.trim().toLowerCase();
+  const phone=document.getElementById('regPhone').value.trim();
+  const pass=document.getElementById('regPassword').value;
+  const confirm=document.getElementById('regConfirm').value;
+  const err=document.getElementById('registerError');
+  if(!first||!last||!email||!pass){err.textContent='Please fill all required fields.';err.classList.add('show');return;}
+  if(pass.length<8){err.textContent='Password must be at least 8 characters.';err.classList.add('show');return;}
+  if(pass!==confirm){err.textContent='Passwords do not match.';err.classList.add('show');return;}
+  const users=getUsers();
+  if(users.find(u=>u.email===email)){err.textContent='An account with this email already exists.';err.classList.add('show');return;}
+  err.classList.remove('show');
+  const nu={email,firstName:first,lastName:last,phone,password:pass,address:'',city:'',country:'',joinDate:new Date().toLocaleDateString('en-GB',{year:'numeric',month:'long'}),cart:[],wishlist:[],orders:[]};
+  users.push(nu); DB.set('users',users);
+  currentUser=nu; cart=[]; wishlist=[];
+  showView('shop'); showToast(`Welcome, ${first}!`); updateSbUserArea();
+}
+
+function doUserLogout(){
+  saveUserData(); currentUser=null; cart=[]; wishlist=[];
+  updateSbUserArea(); updateCartBadge(); updateWishBadge();
+  showView('shop'); showToast('Signed out successfully');
+}
+
+function saveUserData(){
+  if(!currentUser)return;
+  const users=getUsers();
+  const idx=users.findIndex(u=>u.email===currentUser.email);
+  if(idx>-1){users[idx]={...users[idx],...currentUser,cart,wishlist};DB.set('users',users);currentUser=users[idx];}
+}
+
+function handleAuthNav(){currentUser?showView('profile'):showView('login');}
+
+function updateSbUserArea(){
+  const area=document.getElementById('sbUserArea');
+  if(!area)return;
+  if(currentUser){
+    const init=(currentUser.firstName[0]+(currentUser.lastName?.[0]||'')).toUpperCase();
+    area.innerHTML=`
+      <div class="sb-signed-in">
+        <div class="sb-avatar">${init}</div>
+        <div style="flex:1;min-width:0;">
+          <div class="sb-user-name">${currentUser.firstName} ${currentUser.lastName}</div>
+          <div class="sb-user-role">Member</div>
+        </div>
+      </div>
+      <button class="sb-btn" onclick="showView('profile')">My Profile</button>
+      <button class="sb-btn danger" onclick="doUserLogout()">Sign Out</button>`;
+  } else {
+    area.innerHTML=`
+      <button class="sb-btn gold" onclick="showView('login')">Sign In</button>
+      <button class="sb-btn" onclick="showView('register')">Create Account</button>`;
+  }
+}
+
+function checkPassStrength(v){
+  const bar=document.getElementById('passStrength');
+  let s=0;if(v.length>=8)s++;if(/[A-Z]/.test(v))s++;if(/[0-9]/.test(v))s++;if(/[^a-zA-Z0-9]/.test(v))s++;
+  const c=['#e05c5c','#e0955c','#e0c65c','#56c48b'],w=['25%','50%','75%','100%'];
+  bar.style.width=v?w[s-1]||'10%':'0';bar.style.background=v?c[s-1]||'var(--red)':'transparent';
+}
+
+/* ═══════════════════════════════════════════
+   ADMIN AUTH
+═══════════════════════════════════════════ */
+function doAdminLogin(){
+  const u=document.getElementById('adminLoginUser').value.trim();
+  const p=document.getElementById('adminLoginPass').value;
+  const c=getAdminCreds();
+  if(u===c.user&&p===c.pass){adminLoggedIn=true;document.getElementById('adminUserName').textContent=u;document.getElementById('adminLoginError').classList.remove('show');showView('admin');}
+  else document.getElementById('adminLoginError').classList.add('show');
+}
+document.getElementById('adminLoginPass').addEventListener('keydown',e=>{if(e.key==='Enter')doAdminLogin();});
+function doAdminLogout(){adminLoggedIn=false;showView('shop');}
+
+/* ═══════════════════════════════════════════
+   CART
+═══════════════════════════════════════════ */
+function openCart(){renderCartDrawer();document.getElementById('cartOverlay').classList.add('open');document.getElementById('cartDrawer').classList.add('open');document.body.style.overflow='hidden';}
+function closeCart(){document.getElementById('cartOverlay').classList.remove('open');document.getElementById('cartDrawer').classList.remove('open');document.body.style.overflow='';}
+function openWishlist(){renderWishlistDrawer();document.getElementById('wishlistOverlay').classList.add('open');document.getElementById('wishlistDrawer').classList.add('open');document.body.style.overflow='hidden';}
+function closeWishlist(){document.getElementById('wishlistOverlay').classList.remove('open');document.getElementById('wishlistDrawer').classList.remove('open');document.body.style.overflow='';}
+
+function addToCart(id){
+  if(!currentUser){showToast('Please sign in to add to cart');showView('login');return;}
+  const ex=cart.find(i=>i.productId===id);
+  if(ex)ex.qty++;else cart.push({productId:id,qty:1});
+  saveUserData();updateCartBadge();
+  const p=getProducts().find(x=>x.id===id);
+  showToast(p?`"${p.name}" added to cart`:'Added to cart');
+  pulseBadge('cartBadge');
+}
+function removeFromCart(id){cart=cart.filter(i=>i.productId!==id);saveUserData();updateCartBadge();renderCartDrawer();showToast('Removed from cart');}
+function updateQty(id,d){const it=cart.find(i=>i.productId===id);if(!it)return;it.qty=Math.max(1,it.qty+d);saveUserData();updateCartBadge();renderCartDrawer();}
+function updateCartBadge(){
+  const t=cart.reduce((s,i)=>s+i.qty,0);
+  ['cartBadge','profileCartBadge'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=t;});
+}
+function pulseBadge(id){const el=document.getElementById(id);if(!el)return;el.classList.remove('pulse');void el.offsetWidth;el.classList.add('pulse');}
+
+function renderCartDrawer(){
+  const body=document.getElementById('cartBody'),foot=document.getElementById('cartFooter');
+  const cur=getSettings().currency||'€';
+  if(!cart.length){
+    body.innerHTML=`<div class="cart-empty-state"><div class="icon">⊕</div><p>Cart is empty</p><span>Explore our collections</span></div>`;
+    foot.style.display='none';return;
+  }
+  const products=getProducts();let total=0;
+  body.innerHTML=cart.map(item=>{
+    const p=products.find(x=>x.id===item.productId);if(!p)return '';
+    total+=p.price*item.qty;
+    const img=p.image?`<img src="${p.image}" style="width:100%;height:100%;object-fit:cover;">`:p.name[0];
+    return `<div class="cart-item">
+      <div class="cart-thumb">${img}</div>
+      <div class="cart-item-info">
+        <div class="cart-item-name">${p.name}</div>
+        <div class="cart-item-brand">${p.brand||'Maison Noir'}</div>
+        <div class="cart-item-price">${cur} ${Number(p.price).toLocaleString()}</div>
+        <div class="cart-qty"><button class="qty-btn" onclick="updateQty('${p.id}',-1)">−</button><span class="qty-val">${item.qty}</span><button class="qty-btn" onclick="updateQty('${p.id}',1)">+</button></div>
+      </div>
+      <button class="cart-remove" onclick="removeFromCart('${p.id}')">✕</button>
+    </div>`;
+  }).join('');
+  document.getElementById('cartTotal').textContent=`${cur} ${total.toLocaleString()}`;
+  foot.style.display='block';
+}
+
+function handleCheckout(){
+  if(!currentUser){showView('login');return;}
+  const products=getProducts(),cur=getSettings().currency||'€';
+  const total=cart.reduce((s,i)=>{const p=products.find(x=>x.id===i.productId);return s+(p?p.price*i.qty:0);},0);
+  if(!currentUser.orders)currentUser.orders=[];
+  currentUser.orders.push({id:'ORD'+Date.now(),date:new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}),items:[...cart],total});
+  cart=[];saveUserData();updateCartBadge();closeCart();showToast('Order placed! Thank you for shopping with Maison Noir.');
+}
+
+/* ═══════════════════════════════════════════
+   WISHLIST
+═══════════════════════════════════════════ */
+function toggleWishlist(id){
+  if(!currentUser){showToast('Please sign in to save items');showView('login');return;}
+  const idx=wishlist.indexOf(id);
+  if(idx>-1)wishlist.splice(idx,1);else{wishlist.push(id);pulseBadge('wishBadge');}
+  saveUserData();updateWishBadge();renderShopProducts(activeCat);
+  const p=getProducts().find(x=>x.id===id);
+  showToast(idx>-1?'Removed from wishlist':`"${p?.name}" saved to wishlist`);
+}
+function updateWishBadge(){
+  const b=document.getElementById('wishBadge');if(!b)return;
+  b.textContent=wishlist.length;b.classList.toggle('show',wishlist.length>0);
+}
+function renderWishlistDrawer(){
+  const body=document.getElementById('wishlistBody'),cur=getSettings().currency||'€';
+  if(!wishlist.length){body.innerHTML=`<div class="cart-empty-state"><div class="icon">♡</div><p>Wishlist is empty</p><span>Tap ♡ on any product</span></div>`;return;}
+  const products=getProducts();
+  body.innerHTML=wishlist.map(id=>{
+    const p=products.find(x=>x.id===id);if(!p)return '';
+    const img=p.image?`<img src="${p.image}" style="width:100%;height:100%;object-fit:cover;">`:p.name[0];
+    return `<div class="cart-item">
+      <div class="cart-thumb">${img}</div>
+      <div class="cart-item-info">
+        <div class="cart-item-name">${p.name}</div>
+        <div class="cart-item-brand">${p.brand||'Maison Noir'}</div>
+        <div class="cart-item-price">${cur} ${Number(p.price).toLocaleString()}</div>
+        <button class="move-to-cart-btn" onclick="addToCart('${p.id}');closeWishlist()">Move to Cart</button>
+      </div>
+      <button class="cart-remove" onclick="toggleWishlist('${p.id}')">✕</button>
+    </div>`;
+  }).join('');
+}
+
+/* ═══════════════════════════════════════════
+   SHOP RENDER
+═══════════════════════════════════════════ */
+function renderShop(){
+  renderSidebarCats();renderShopProducts(activeCat);renderFooterCats();
+  const el=document.getElementById('totalPiecesStat');
+  if(el) el.textContent=getProducts().filter(p=>p.visible).length+'+';
+}
+
+function renderSidebarCats(){
+  const cats=getCategories();
+  const container=document.getElementById('sidebarCatLinks');
+  container.innerHTML=cats.map(c=>`<button class="sb-link ${activeCat===c?'active':''}" id="cat-${c.replace(/\s/g,'-')}" onclick="filterCat('${c}',this);closeSidebar()"><span class="sb-link-icon">◈</span>${c}</button>`).join('');
+  // sync footer cats into sidebar nav
+  renderFooterCats();
+}
+
+function filterCat(cat,btn){
+  activeCat=cat;
+  document.querySelectorAll('.sb-link').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderShopProducts(cat);
+  document.getElementById('catalogue')?.scrollIntoView({behavior:'smooth'});
+}
+
+function renderShopProducts(cat){
+  const grid=document.getElementById('shopGrid');
+  let products=getProducts().filter(p=>p.visible);
+  if(cat!=='all') products=products.filter(p=>p.category===cat);
+  const cur=getSettings().currency||'€';
+  if(!products.length){grid.innerHTML=`<div class="products-empty"><p>No products here yet</p><span>Check back soon</span></div>`;return;}
+  grid.innerHTML=products.map(p=>{
+    const tagHtml=p.tag?`<span class="product-tag ${p.tag}">${p.tag.charAt(0).toUpperCase()+p.tag.slice(1)}</span>`:'';
+    const oldHtml=p.oldPrice?`<span class="price-old">${cur} ${Number(p.oldPrice).toLocaleString()}</span>`:'';
+    const colors=(p.colors||[]).map(c=>`<div class="clr-dot" style="background:${c}"></div>`).join('');
+    const imgHtml=p.image?`<img class="product-img-el" src="${p.image}" alt="${p.name}">`:`<div class="product-placeholder">${p.name[0]}</div>`;
+    const isWished=wishlist.includes(p.id);
+    return `<div class="product-card">
+      <div class="product-img-wrap">${imgHtml}${tagHtml}
+        <div class="product-actions-bar">
+          <button class="btn-add-cart" onclick="addToCart('${p.id}')">Add to Cart</button>
+          <button class="btn-wish-icon${isWished?' active':''}" onclick="toggleWishlist('${p.id}')">${isWished?'♥':'♡'}</button>
+        </div>
+      </div>
+      <div class="product-info">
+        <p class="product-brand">${p.brand||'Maison Noir'}</p>
+        <h3 class="product-name">${p.name}</h3>
+        <div class="product-price"><span>${cur} ${Number(p.price).toLocaleString()}</span>${oldHtml}</div>
+        <div class="product-colors">${colors}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderFooterCats(){
+  const el=document.getElementById('footerCats');
+  if(el) el.innerHTML=getCategories().map(c=>`<li><a onclick="filterCat('${c}',null)">${c}</a></li>`).join('');
+}
+
+/* ═══════════════════════════════════════════
+   PROFILE
+═══════════════════════════════════════════ */
+function renderProfile(){
+  if(!currentUser){showView('login');return;}
+  const u=currentUser,cur=getSettings().currency||'€';
+  const init=(u.firstName[0]+(u.lastName?.[0]||'')).toUpperCase();
+  document.getElementById('profileAvatarLetter').textContent=init;
+  document.getElementById('profileFullName').textContent=`${u.firstName} ${u.lastName}`;
+  document.getElementById('profileEmailDisp').textContent=u.email;
+  document.getElementById('profileSince').textContent=`Member since ${u.joinDate}`;
+  document.getElementById('phOrders').textContent=(u.orders||[]).length;
+  document.getElementById('phWish').textContent=wishlist.length;
+  document.getElementById('phCart').textContent=cart.reduce((s,i)=>s+i.qty,0);
+  updateCartBadge();
+  // Info grid
+  document.getElementById('profileInfoGrid').innerHTML=`
+    <div class="info-field"><div class="info-field-label">First Name</div><div class="info-field-value">${u.firstName}</div></div>
+    <div class="info-field"><div class="info-field-label">Last Name</div><div class="info-field-value">${u.lastName}</div></div>
+    <div class="info-field"><div class="info-field-label">Email</div><div class="info-field-value">${u.email}</div></div>
+    <div class="info-field"><div class="info-field-label">Phone</div><div class="info-field-value">${u.phone||'—'}</div></div>
+    <div class="info-field"><div class="info-field-label">Address</div><div class="info-field-value">${u.address||'—'}</div></div>
+    <div class="info-field"><div class="info-field-label">City</div><div class="info-field-value">${u.city||'—'}</div></div>
+    <div class="info-field"><div class="info-field-label">Country</div><div class="info-field-value">${u.country||'—'}</div></div>
+    <div class="info-field"><div class="info-field-label">Member Since</div><div class="info-field-value">${u.joinDate}</div></div>`;
+  // Cart summary
+  const products=getProducts();
+  if(cart.length){
+    const total=cart.reduce((s,i)=>{const p=products.find(x=>x.id===i.productId);return s+(p?p.price*i.qty:0);},0);
+    document.getElementById('profileCartSummary').innerHTML=cart.slice(0,3).map(item=>{
+      const p=products.find(x=>x.id===item.productId);if(!p)return '';
+      return `<div style="display:flex;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid rgba(245,242,238,.06);">
+        <div style="width:50px;height:62px;background:#111;border:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:'Cormorant Garamond',serif;font-size:20px;font-style:italic;color:rgba(201,169,110,.2);overflow:hidden;">${p.image?`<img src="${p.image}" style="width:100%;height:100%;object-fit:cover;">`:p.name[0]}</div>
+        <div style="flex:1;"><div style="font-family:'Cormorant Garamond',serif;font-size:15px;">${p.name}</div><div style="font-size:8px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin:3px 0;">${p.category}</div><div style="font-size:12px;">${cur} ${Number(p.price).toLocaleString()}</div></div>
+        <div style="font-size:10px;color:rgba(245,242,238,.4);">×${item.qty}</div>
+      </div>`;
+    }).join('')+`<div style="text-align:right;padding:12px 0;font-family:'Cormorant Garamond',serif;font-size:17px;">Total: ${cur} ${total.toLocaleString()}</div>`;
+  } else {
+    document.getElementById('profileCartSummary').innerHTML=`<div class="empty-msg" style="padding:22px;"><p>Cart is empty</p><span>Browse our collections</span></div>`;
+  }
+  // Orders
+  const orders=u.orders||[];
+  document.getElementById('profileOrdersList').innerHTML=orders.length
+    ? [...orders].reverse().map(o=>{const items=o.items.map(i=>{const p=products.find(x=>x.id===i.productId);return p?`${p.name} ×${i.qty}`:''}).filter(Boolean).join(', ');return `<div class="order-row"><div class="order-row-top"><span class="order-id">${o.id}</span><span class="order-date">${o.date}</span></div><div class="order-items-text">${items}</div><div class="order-total">${cur} ${Number(o.total).toLocaleString()}</div></div>`;}).join('')
+    : `<div class="empty-msg"><p>No orders yet</p><span>Your order history will appear here</span></div>`;
+  // Wishlist
+  renderProfileWishlist();
+  // Pre-fill settings
+  document.getElementById('editFirst').value=u.firstName||'';
+  document.getElementById('editLast').value=u.lastName||'';
+  document.getElementById('editEmail').value=u.email||'';
+  document.getElementById('editPhone').value=u.phone||'';
+  document.getElementById('editAddress').value=u.address||'';
+  document.getElementById('editCity').value=u.city||'';
+  document.getElementById('editCountry').value=u.country||'';
+}
+
+function renderProfileWishlist(){
+  const grid=document.getElementById('profileWishGrid'),cur=getSettings().currency||'€',products=getProducts();
+  if(!wishlist.length){grid.innerHTML=`<div class="empty-msg" style="grid-column:1/-1;"><p>Wishlist is empty</p><span>Tap ♡ on products</span></div>`;return;}
+  grid.innerHTML=wishlist.map(id=>{
+    const p=products.find(x=>x.id===id);if(!p)return '';
+    return `<div class="wl-card">
+      <div class="wl-img">${p.image?`<img src="${p.image}">`:`${p.name[0]}`}</div>
+      <button class="wl-remove" onclick="toggleWishlist('${p.id}');renderProfileWishlist()">✕</button>
+      <div class="wl-info"><div class="wl-name">${p.name}</div><div class="wl-price">${cur} ${Number(p.price).toLocaleString()}</div><button class="wl-cart-btn" onclick="addToCart('${p.id}')">Add to Cart</button></div>
+    </div>`;
+  }).join('');
+}
+
+function showPTab(name,btn){
+  document.querySelectorAll('.psec').forEach(s=>s.classList.remove('active'));
+  document.getElementById('ptab-'+name).classList.add('active');
+  document.querySelectorAll('.ptab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function saveProfileSettings(){
+  if(!currentUser)return;
+  currentUser.firstName=document.getElementById('editFirst').value.trim()||currentUser.firstName;
+  currentUser.lastName=document.getElementById('editLast').value.trim()||currentUser.lastName;
+  currentUser.email=document.getElementById('editEmail').value.trim()||currentUser.email;
+  currentUser.phone=document.getElementById('editPhone').value.trim();
+  currentUser.address=document.getElementById('editAddress').value.trim();
+  currentUser.city=document.getElementById('editCity').value.trim();
+  currentUser.country=document.getElementById('editCountry').value.trim();
+  saveUserData();renderProfile();showToast('Profile updated');
+}
+
+function changePassword(){
+  if(!currentUser)return;
+  const c=document.getElementById('curPw').value,n=document.getElementById('newPw').value,f=document.getElementById('cfPw').value;
+  if(c!==currentUser.password){showToast('Current password incorrect');return;}
+  if(n.length<8){showToast('New password must be at least 8 characters');return;}
+  if(n!==f){showToast('Passwords do not match');return;}
+  currentUser.password=n;saveUserData();
+  ['curPw','newPw','cfPw'].forEach(id=>document.getElementById(id).value='');
+  showToast('Password updated');
+}
+
+function deleteAccount(){
+  if(!currentUser)return;
+  if(!confirm('Delete your account? This cannot be undone.'))return;
+  DB.set('users',getUsers().filter(u=>u.email!==currentUser.email));
+  currentUser=null;cart=[];wishlist=[];updateSbUserArea();updateCartBadge();showView('shop');showToast('Account deleted');
+}
+
+/* ═══════════════════════════════════════════
+   ADMIN
+═══════════════════════════════════════════ */
+function renderAdminPanel(){
+  updateAdminDashboard();renderProductsTable();renderCatsAdmin();renderAdminCatBar();renderUsersTable();loadSettings();
+  document.getElementById('setAdminUser').value=getAdminCreds().user;
+  document.getElementById('navProdCount').textContent=getProducts().length;
+  document.getElementById('navUserCount').textContent=getUsers().length;
+}
+
+function updateAdminDashboard(){
+  const p=getProducts(),u=getUsers(),c=getCategories(),cur=getSettings().currency||'€';
+  document.getElementById('d-products').textContent=p.length;
+  document.getElementById('d-users').textContent=u.length;
+  document.getElementById('d-cats').textContent=c.length;
+  document.getElementById('d-visible').textContent=p.filter(x=>x.visible).length;
+  document.getElementById('navProdCount').textContent=p.length;
+  document.getElementById('navUserCount').textContent=u.length;
+  const recent=[...p].reverse().slice(0,5);
+  document.getElementById('recentProducts').innerHTML=recent.length
+    ? recent.map(x=>`<div style="display:flex;align-items:center;gap:13px;padding:10px 0;border-bottom:1px solid var(--border);">
+        <div style="width:36px;height:44px;background:var(--black);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:'Cormorant Garamond',serif;font-style:italic;font-size:15px;color:rgba(201,169,110,.28);flex-shrink:0;overflow:hidden;">${x.image?`<img src="${x.image}" style="width:100%;height:100%;object-fit:cover;">`:x.name[0]}</div>
+        <div style="flex:1;"><div style="font-family:'Cormorant Garamond',serif;font-size:14px;">${x.name}</div><div style="font-size:8px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);margin-top:2px;">${x.category}</div></div>
+        <div style="font-size:12px;">${cur} ${Number(x.price).toLocaleString()}</div>
+        <div style="width:8px;height:8px;border-radius:50%;background:${x.visible?'var(--green)':'var(--red)'};" title="${x.visible?'Visible':'Hidden'}"></div>
+      </div>`).join('')
+    : `<div style="text-align:center;padding:24px;color:rgba(245,242,238,.2);font-style:italic;">No products yet.</div>`;
+}
+
+function renderUsersTable(){
+  const users=getUsers(),tbody=document.getElementById('usersTableBody'),empty=document.getElementById('usersEmpty');
+  if(!users.length){tbody.innerHTML='';empty.style.display='block';return;}
+  empty.style.display='none';
+  tbody.innerHTML=users.map(u=>{
+    const init=(u.firstName[0]+(u.lastName?.[0]||'')).toUpperCase();
+    const cl=(u.cart||[]).reduce((s,i)=>s+i.qty,0),wl=(u.wishlist||[]).length;
+    return `<tr><td><div class="u-av">${init}</div></td><td>${u.firstName} ${u.lastName}</td><td style="color:rgba(245,242,238,.55);">${u.email}</td><td style="color:rgba(245,242,238,.45);">${u.phone||'—'}</td><td style="font-size:11px;color:rgba(245,242,238,.38);">${u.joinDate}</td><td><span class="tbl-cat" style="font-size:8px;">${cl} item${cl!==1?'s':''}</span></td><td style="color:rgba(245,242,242,.45);">${wl} saved</td></tr>`;
+  }).join('');
+}
+
+function renderAdminCatBar(){
+  const bar=document.getElementById('adminCatBar'),cats=getCategories();
+  bar.innerHTML=`<button class="cfilter ${adminCatFilter==='all'?'active':''}" onclick="adminFilterCat('all',this)">All</button>`;
+  cats.forEach(c=>{bar.innerHTML+=`<button class="cfilter ${adminCatFilter===c?'active':''}" onclick="adminFilterCat('${c}',this)">${c}</button>`;});
+}
+
+function adminFilterCat(cat,btn){
+  adminCatFilter=cat;
+  document.querySelectorAll('.cfilter').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');renderProductsTable();
+}
+
+function renderProductsTable(){
+  const search=(document.getElementById('productSearch')?.value||'').toLowerCase();
+  let products=getProducts();
+  if(adminCatFilter!=='all') products=products.filter(p=>p.category===adminCatFilter);
+  if(search) products=products.filter(p=>p.name.toLowerCase().includes(search)||(p.brand||'').toLowerCase().includes(search)||p.category.toLowerCase().includes(search));
+  const cur=getSettings().currency||'€',tbody=document.getElementById('productsTableBody'),empty=document.getElementById('tableEmpty');
+  if(!products.length){tbody.innerHTML='';empty.style.display='block';return;}
+  empty.style.display='none';
+  tbody.innerHTML=products.map(p=>{
+    const tagH=p.tag?`<span style="background:var(--gold);color:var(--black);font-size:7px;padding:3px 8px;letter-spacing:.18em;text-transform:uppercase;">${p.tag}</span>`:'<span style="color:rgba(245,242,238,.22);font-size:10px;">—</span>';
+    const thumb=p.image?`<img class="tbl-thumb" src="${p.image}" alt="${p.name}">`:`<div class="tbl-thumb-ph">${p.name[0]}</div>`;
+    return `<tr><td>${thumb}</td><td><div class="tbl-pname">${p.name}</div><div class="tbl-brand">${p.brand||'Maison Noir'}</div></td><td><span class="tbl-cat">${p.category}</span></td><td>${cur} ${Number(p.price).toLocaleString()}${p.oldPrice?`<br><span style="color:rgba(245,242,238,.28);font-size:10px;text-decoration:line-through;">${cur} ${Number(p.oldPrice).toLocaleString()}</span>`:''}</td><td>${tagH}</td><td><div class="toggle-sw ${p.visible?'on':''}" onclick="toggleVisibility('${p.id}')"></div></td><td><div class="tbl-actions"><button class="tbl-btn edit" onclick="openProductModal('${p.id}')">Edit</button><button class="tbl-btn del" onclick="confirmDelete('${p.id}')">Delete</button></div></td></tr>`;
+  }).join('');
+}
+
+function toggleVisibility(id){
+  const products=getProducts(),p=products.find(x=>x.id===id);
+  if(p){p.visible=!p.visible;DB.set('products',products);renderProductsTable();updateAdminDashboard();showToast(p.visible?`"${p.name}" visible`:`"${p.name}" hidden`);}
+}
+
+function renderCatsAdmin(){
+  const cats=getCategories(),products=getProducts();
+  document.getElementById('catsGrid').innerHTML=cats.map(c=>{
+    const count=products.filter(p=>p.category===c).length;
+    return `<div class="cat-card"><button class="cat-del-btn" onclick="deleteCategory('${c}')">✕</button><div class="cat-card-name">${c}</div><div class="cat-card-count">${count} product${count!==1?'s':''}</div></div>`;
+  }).join('');
+}
+
+function addCategory(){
+  const inp=document.getElementById('newCatName'),name=inp.value.trim();
+  if(!name)return;const cats=getCategories();
+  if(cats.includes(name)){showToast('Category already exists');return;}
+  cats.push(name);DB.set('categories',cats);inp.value='';
+  renderCatsAdmin();renderAdminCatBar();renderShop();showToast(`"${name}" added`);
+}
+
+function deleteCategory(cat){
+  DB.set('categories',getCategories().filter(c=>c!==cat));
+  renderCatsAdmin();renderAdminCatBar();renderShop();showToast(`"${cat}" removed`);
+}
+
+const adminSecTitles={dashboard:'Dashboard <span>Overview</span>',products:'Products <span>Catalogue</span>',categories:'Categories <span>Manager</span>',users:'Registered <span>Users</span>',settings:'Store <span>Settings</span>'};
+function showAdminSec(name,el){
+  document.querySelectorAll('.admin-sec').forEach(s=>s.classList.remove('active'));
+  document.getElementById('sec-'+name).classList.add('active');
+  document.querySelectorAll('.admin-nav-item').forEach(i=>i.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('adminPageTitle').innerHTML=adminSecTitles[name]||name;
+  if(name==='products')renderProductsTable();
+  if(name==='categories')renderCatsAdmin();
+  if(name==='settings'){loadSettings();document.getElementById('setAdminUser').value=getAdminCreds().user;}
+  if(name==='users')renderUsersTable();
+  closeSidebarAdmin();
+}
+
+/* admin sidebar mobile */
+function toggleAdminSidebar(){document.getElementById('adminSidebar').classList.toggle('open');document.getElementById('adminSbOverlay').classList.toggle('open');}
+function closeSidebarAdmin(){document.getElementById('adminSidebar').classList.remove('open');document.getElementById('adminSbOverlay').classList.remove('open');}
+
+/* ═══════════════════════════════════════════
+   PRODUCT MODAL
+═══════════════════════════════════════════ */
+let colorCount=0;
+function openProductModal(id){
+  const modal=document.getElementById('productModal'),catSel=document.getElementById('pCategory');
+  catSel.innerHTML=getCategories().map(c=>`<option value="${c}">${c}</option>`).join('');
+  colorCount=0;
+  if(id){
+    const p=getProducts().find(x=>x.id===id);if(!p)return;
+    document.getElementById('modalTitle').textContent='Edit Product';
+    document.getElementById('editProductId').value=id;
+    document.getElementById('pName').value=p.name;document.getElementById('pBrand').value=p.brand||'';
+    catSel.value=p.category;document.getElementById('pTag').value=p.tag||'';
+    document.getElementById('pPrice').value=p.price;document.getElementById('pOldPrice').value=p.oldPrice||'';
+    document.getElementById('pDesc').value=p.desc||'';document.getElementById('pImageData').value=p.image||'';
+    const prev=document.getElementById('imagePreview');
+    if(p.image){prev.src=p.image;prev.style.display='block';}else prev.style.display='none';
+    document.getElementById('pVisibleToggle').classList.toggle('on',p.visible!==false);
+    document.getElementById('colorInputs').innerHTML='';
+    (p.colors||[]).forEach(c=>addColorInput(c));
+  } else {
+    document.getElementById('modalTitle').textContent='Add New Product';
+    document.getElementById('editProductId').value='';
+    ['pName','pBrand','pOldPrice','pDesc'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('pTag').value='';document.getElementById('pPrice').value='';
+    document.getElementById('pImageData').value='';document.getElementById('imagePreview').style.display='none';
+    document.getElementById('pVisibleToggle').classList.add('on');
+    document.getElementById('colorInputs').innerHTML='';addColorInput('#1a1a1a');
+  }
+  modal.classList.add('open');document.body.style.overflow='hidden';
+}
+function closeProductModal(){document.getElementById('productModal').classList.remove('open');document.body.style.overflow='';}
+function handleImgUpload(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{document.getElementById('pImageData').value=ev.target.result;const prev=document.getElementById('imagePreview');prev.src=ev.target.result;prev.style.display='block';};
+  reader.readAsDataURL(file);
+}
+function addColorInput(val){
+  colorCount++;const id='col_'+colorCount;
+  const div=document.createElement('div');div.className='color-input-wrap';div.id=id;
+  div.innerHTML=`<input type="color" value="${val||'#000000'}" oninput="document.querySelector('#${id} input[type=text]').value=this.value"><input type="text" value="${val||'#000000'}" maxlength="7" oninput="if(/^#[0-9a-fA-F]{6}$/.test(this.value))document.querySelector('#${id} input[type=color]').value=this.value"><span style="cursor:pointer;color:rgba(245,242,238,.28);margin-left:4px;" onclick="document.getElementById('${id}').remove()">✕</span>`;
+  document.getElementById('colorInputs').appendChild(div);
+}
+function getColors(){return [...document.querySelectorAll('#colorInputs .color-input-wrap')].map(w=>w.querySelector('input[type="text"]').value).filter(Boolean);}
+
+function saveProduct(){
+  const name=document.getElementById('pName').value.trim(),price=document.getElementById('pPrice').value,cat=document.getElementById('pCategory').value;
+  if(!name||!price||!cat){showToast('Name, price and category are required');return;}
+  const products=getProducts(),editId=document.getElementById('editProductId').value;
+  const product={id:editId||'p'+Date.now(),name,brand:document.getElementById('pBrand').value.trim()||'Maison Noir',category:cat,tag:document.getElementById('pTag').value,price:parseFloat(price),oldPrice:parseFloat(document.getElementById('pOldPrice').value)||null,desc:document.getElementById('pDesc').value.trim(),image:document.getElementById('pImageData').value,colors:getColors(),visible:document.getElementById('pVisibleToggle').classList.contains('on')};
+  if(editId){const idx=products.findIndex(p=>p.id===editId);if(idx>-1)products[idx]=product;showToast(`"${name}" updated`);}
+  else{products.push(product);showToast(`"${name}" added to catalogue`);}
+  DB.set('products',products);closeProductModal();renderProductsTable();updateAdminDashboard();renderShop();
+  document.getElementById('navProdCount').textContent=products.length;
+}
+
+/* delete */
+let pendingDeleteId=null;
+function confirmDelete(id){pendingDeleteId=id;document.getElementById('confirmOverlay').classList.add('open');}
+function closeConfirm(){pendingDeleteId=null;document.getElementById('confirmOverlay').classList.remove('open');}
+document.getElementById('confirmDelBtn').addEventListener('click',()=>{
+  if(!pendingDeleteId)return;
+  DB.set('products',getProducts().filter(p=>p.id!==pendingDeleteId));
+  closeConfirm();renderProductsTable();updateAdminDashboard();renderShop();showToast('Product deleted');
+});
+
+/* settings */
+function loadSettings(){
+  const s=getSettings();
+  document.getElementById('setStoreName').value=s.storeName||'';
+  document.getElementById('setTagline').value=s.tagline||'';
+  document.getElementById('setCurrency').value=s.currency||'€';
+}
+function saveSettings(){
+  DB.set('settings',{storeName:document.getElementById('setStoreName').value.trim(),tagline:document.getElementById('setTagline').value.trim(),currency:document.getElementById('setCurrency').value.trim()||'€'});
+  showToast('Settings saved');
+}
+function saveAdminAccount(){
+  const c=getAdminCreds(),cur=document.getElementById('setCurrentPw').value,nw=document.getElementById('setNewPw').value,cf=document.getElementById('setConfirmPw').value,nu=document.getElementById('setAdminUser').value.trim();
+  if(!nu){showToast('Username cannot be empty');return;}
+  if(nw||cur){if(cur!==c.pass){showToast('Current password incorrect');return;}if(nw!==cf){showToast('Passwords do not match');return;}if(nw.length<6){showToast('Min 6 characters');return;}DB.set('adminCreds',{user:nu,pass:nw});}
+  else DB.set('adminCreds',{user:nu,pass:c.pass});
+  document.getElementById('adminUserName').textContent=nu;
+  ['setCurrentPw','setNewPw','setConfirmPw'].forEach(id=>document.getElementById(id).value='');
+  showToast('Admin account updated');
+}
+
+/* ═══════════════════════════════════════════
+   SLIDER
+═══════════════════════════════════════════ */
+let sliderCur=0;
+function goTo(n){sliderCur=(n+3)%3;const t=document.getElementById('testimonialTrack');if(t)t.style.transform=`translateX(-${sliderCur*100}%)`;document.querySelectorAll('.slider-dot').forEach((d,i)=>d.classList.toggle('active',i===sliderCur));}
+function nextSlide(){goTo(sliderCur+1);}function prevSlide(){goTo(sliderCur-1);}
+setInterval(()=>{if(document.getElementById('shopView').classList.contains('active'))nextSlide();},6000);
+
+/* ═══════════════════════════════════════════
+   CURSOR
+═══════════════════════════════════════════ */
+const curEl=document.getElementById('cursor'),ringEl=document.getElementById('cursorRing');
+let mX=0,mY=0,rX=0,rY=0;
+document.addEventListener('mousemove',e=>{mX=e.clientX;mY=e.clientY;curEl.style.left=mX+'px';curEl.style.top=mY+'px';});
+(function anim(){rX+=(mX-rX)*.12;rY+=(mY-rY)*.12;ringEl.style.left=rX+'px';ringEl.style.top=rY+'px';requestAnimationFrame(anim);})();
+document.addEventListener('mouseover',e=>{if(e.target.closest('a,button,[onclick],.product-card,.stat-item,.sb-link'))document.body.classList.add('hovering');});
+document.addEventListener('mouseout',e=>{if(e.target.closest('a,button,[onclick],.product-card,.stat-item,.sb-link'))document.body.classList.remove('hovering');});
+
+/* scroll reveal */
+const revIO=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('revealed');revIO.unobserve(e.target);}});},{threshold:.1});
+function attachReveals(){document.querySelectorAll('.reveal').forEach(r=>revIO.observe(r));}
+
+/* counter */
+function animCounters(){document.querySelectorAll('.stat-number').forEach(el=>{const raw=el.textContent,num=parseFloat(raw);if(isNaN(num))return;const suf=raw.replace(/[\d.]/g,'');let st=null;(function step(ts){if(!st)st=ts;const p=Math.min((ts-st)/1800,1);el.textContent=Math.floor(p*num)+suf;if(p<1)requestAnimationFrame(step);})(performance.now());});}
+new IntersectionObserver(entries=>{if(entries[0].isIntersecting)animCounters();},{threshold:.3}).observe(document.querySelector('.feature-band')||document.body);
+
+/* toast */
+let toastT;
+function showToast(msg){document.getElementById('toastMsg').textContent=msg;const t=document.getElementById('toast');t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),3200);}
+
+/* newsletter */
+function handleSubscribe(e){e.preventDefault();e.target.querySelector('input').value='';showToast("You're now in the Maison Noir circle!");}
+
+/* ═══════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════ */
+initData();
+showView('shop');
+setTimeout(attachReveals,100);
+</script>
+</body>
+</html>
