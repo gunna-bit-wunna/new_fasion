@@ -506,6 +506,18 @@ footer{background:#050505;padding:52px 24px 32px;border-top:1px solid var(--bord
 
 /* Forms */
 .form-group{margin-bottom:16px;}
+/* Password show/hide wrapper */
+.pw-wrap{position:relative;display:block;}
+.pw-wrap .form-input{padding-right:48px;}
+.pw-eye{
+  position:absolute;right:0;top:0;bottom:0;width:46px;
+  display:flex;align-items:center;justify-content:center;
+  background:none;border:none;color:rgba(244,241,237,.35);
+  font-size:17px;cursor:pointer;transition:color .2s;
+  -webkit-tap-highlight-color:transparent;
+}
+.pw-eye:active{color:var(--gold);}
+
 .form-label{display:block;font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:rgba(244,241,237,.38);margin-bottom:8px;}
 .form-input,.form-select,.form-textarea{
   width:100%;padding:13px 14px;background:rgba(255,255,255,.04);
@@ -1101,7 +1113,7 @@ footer{padding-bottom:max(32px,env(safe-area-inset-bottom,16px));}
     <div class="auth-logo">MAISON NOIR</div>
     <div class="auth-sub">Sign In to Your Account</div>
     <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="loginEmail" type="email" inputmode="email" autocomplete="email" placeholder="your@email.com"></div>
-    <div class="form-group"><label class="form-label">Password</label><input class="form-input" id="loginPassword" type="password" autocomplete="current-password" placeholder="••••••••"></div>
+    <div class="form-group"><label class="form-label">Password</label><div class="pw-wrap"><input class="form-input" id="loginPassword" type="password" placeholder="Enter password"><button type="button" class="pw-eye" onclick="togglePw(this)">👁</button></div></div>
     <div class="auth-err" id="loginError">Invalid email or password.</div>
     <button class="btn-primary full" style="margin-top:8px;" onclick="doUserLogin()"><span>Sign In</span></button>
     <div class="auth-switch">No account? <a onclick="showView('register')">Create one</a></div>
@@ -1122,10 +1134,10 @@ footer{padding-bottom:max(32px,env(safe-area-inset-bottom,16px));}
     <div class="form-group"><label class="form-label">Phone (optional)</label><input class="form-input" id="regPhone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+1 234 567 890"></div>
     <div class="form-group">
       <label class="form-label">Password</label>
-      <input class="form-input" id="regPassword" type="password" autocomplete="new-password" placeholder="At least 8 characters" oninput="checkPassStrength(this.value)">
+      <div class="pw-wrap"><input class="form-input" id="regPassword" type="password" placeholder="At least 8 characters" oninput="checkPassStrength(this.value)"><button type="button" class="pw-eye" onclick="togglePw(this)">👁</button></div>
       <div class="pass-bar" id="passStrength"></div>
     </div>
-    <div class="form-group"><label class="form-label">Confirm Password</label><input class="form-input" id="regConfirm" type="password" autocomplete="new-password" placeholder="Repeat password"></div>
+    <div class="form-group"><label class="form-label">Confirm Password</label><div class="pw-wrap"><input class="form-input" id="regConfirm" type="password" placeholder="Repeat password"><button type="button" class="pw-eye" onclick="togglePw(this)">👁</button></div></div>
     <div class="auth-err" id="registerError"></div>
     <button class="btn-primary full" style="margin-top:8px;" onclick="doRegister()"><span>Create Account</span></button>
     <div class="auth-switch">Have an account? <a onclick="showView('login')">Sign in</a></div>
@@ -1139,7 +1151,7 @@ footer{padding-bottom:max(32px,env(safe-area-inset-bottom,16px));}
     <div class="auth-logo">MAISON NOIR</div>
     <div class="auth-sub">Admin Portal</div>
     <div class="form-group"><label class="form-label">Username</label><input class="form-input" id="adminLoginUser" type="text" autocomplete="username" placeholder="admin"></div>
-    <div class="form-group"><label class="form-label">Password</label><input class="form-input" id="adminLoginPass" type="password" autocomplete="current-password" placeholder="••••••••"></div>
+    <div class="form-group"><label class="form-label">Password</label><div class="pw-wrap"><input class="form-input" id="adminLoginPass" type="password" placeholder="Enter password"><button type="button" class="pw-eye" onclick="togglePw(this)">👁</button></div></div>
     <div class="auth-err" id="adminLoginError">Invalid credentials.</div>
     <button class="btn-primary full" style="margin-top:8px;" onclick="doAdminLogin()"><span>Enter Admin Panel</span></button>
     <button class="back-link" onclick="showView('shop')">← Back to Store</button>
@@ -1196,9 +1208,9 @@ footer{padding-bottom:max(32px,env(safe-area-inset-bottom,16px));}
       </div>
       <div class="pcard">
         <h3 class="pcard-title">Change Password</h3>
-        <div class="form-group"><label class="form-label">Current Password</label><input class="form-input" id="curPw" type="password" autocomplete="current-password" placeholder="••••••••"></div>
-        <div class="form-group"><label class="form-label">New Password</label><input class="form-input" id="newPw" type="password" autocomplete="new-password" placeholder="••••••••"></div>
-        <div class="form-group"><label class="form-label">Confirm New</label><input class="form-input" id="cfPw" type="password" autocomplete="new-password" placeholder="••••••••"></div>
+        <div class="form-group"><label class="form-label">Current Password</label><div class="pw-wrap"><input class="form-input" id="curPw" type="password" placeholder="••••••••"><button type="button" class="pw-eye" onclick="togglePw(this)">👁</button></div></div>
+        <div class="form-group"><label class="form-label">New Password</label><div class="pw-wrap"><input class="form-input" id="newPw" type="password" placeholder="••••••••"><button type="button" class="pw-eye" onclick="togglePw(this)">👁</button></div></div>
+        <div class="form-group"><label class="form-label">Confirm New</label><div class="pw-wrap"><input class="form-input" id="cfPw" type="password" placeholder="••••••••"><button type="button" class="pw-eye" onclick="togglePw(this)">👁</button></div></div>
         <button class="btn-primary full" style="margin-top:14px;" onclick="changePassword()"><span>Update Password</span></button>
       </div>
       <div class="pcard">
@@ -1311,9 +1323,9 @@ footer{padding-bottom:max(32px,env(safe-area-inset-bottom,16px));}
         <div class="settings-card">
           <h3 class="settings-card-title">Admin Account</h3>
           <div class="form-group"><label class="form-label">Username</label><input class="form-input" id="setAdminUser" type="text" autocomplete="username"></div>
-          <div class="form-group"><label class="form-label">Current Password</label><input class="form-input" id="setCurrentPw" type="password" autocomplete="current-password" placeholder="••••••••"></div>
-          <div class="form-group"><label class="form-label">New Password</label><input class="form-input" id="setNewPw" type="password" autocomplete="new-password" placeholder="••••••••"></div>
-          <div class="form-group"><label class="form-label">Confirm New Password</label><input class="form-input" id="setConfirmPw" type="password" autocomplete="new-password" placeholder="••••••••"></div>
+          <div class="form-group"><label class="form-label">Current Password</label><div class="pw-wrap"><input class="form-input" id="setCurrentPw" type="password" placeholder="••••••••"><button type="button" class="pw-eye" onclick="togglePw(this)">👁</button></div></div>
+          <div class="form-group"><label class="form-label">New Password</label><div class="pw-wrap"><input class="form-input" id="setNewPw" type="password" placeholder="••••••••"><button type="button" class="pw-eye" onclick="togglePw(this)">👁</button></div></div>
+          <div class="form-group"><label class="form-label">Confirm New Password</label><div class="pw-wrap"><input class="form-input" id="setConfirmPw" type="password" placeholder="••••••••"><button type="button" class="pw-eye" onclick="togglePw(this)">👁</button></div></div>
           <button class="settings-save-btn" onclick="saveAdminAccount()">Update Account</button>
         </div>
       </div>
@@ -1456,7 +1468,7 @@ function refreshActiveView() {
     renderShop(); checkNewArrivals();
   }
   if (document.getElementById('adminView')?.classList.contains('active')) {
-    renderProductsTable(); updateAdminDashboard();
+    renderProductsTable(); updateAdminDashboard(); renderUsersTable();
   }
 }
 
@@ -1477,6 +1489,16 @@ async function initData() {
   if (!LS.get('adminCreds'))   LS.set('adminCreds',   { user:'admin', pass:'admin123' });
   if (!LS.get('users'))        LS.set('users',        []);
   if (!LS.get('seenProducts')) LS.set('seenProducts', []);
+  /* Restore login session from previous visit */
+  const savedEmail = LS.get('session');
+  if (savedEmail) {
+    const savedUser = (LS.get('users')||[]).find(u=>u.email===savedEmail);
+    if (savedUser) {
+      currentUser = savedUser;
+      cart        = savedUser.cart    || [];
+      wishlist    = savedUser.wishlist || [];
+    }
+  }
 
   initFirebase();
 
@@ -1594,6 +1616,7 @@ function doUserLogin(){
   if(!user){ document.getElementById('loginError').classList.add('show'); return; }
   document.getElementById('loginError').classList.remove('show');
   currentUser=user; cart=user.cart||[]; wishlist=user.wishlist||[];
+  LS.set('session', user.email); /* persist session across refresh */
   showView('shop'); showToast(`Welcome back, ${user.firstName}!`);
   updateMenuFooter(); updateCartBadge(); updateWishBadge();
 }
@@ -1619,11 +1642,13 @@ function doRegister(){
              cart:[],wishlist:[],orders:[] };
   users.push(nu); LS.set('users',users);
   currentUser=nu; cart=[]; wishlist=[];
+  LS.set('session', nu.email); /* persist session */
   showView('shop'); showToast(`Welcome to Maison Noir, ${first}!`); updateMenuFooter();
 }
 
 function doUserLogout(){
   saveUserData(); currentUser=null; cart=[]; wishlist=[];
+  LS.set('session', null); /* clear session on logout */
   updateMenuFooter(); updateCartBadge(); updateWishBadge();
   showView('shop'); showToast('Signed out successfully');
 }
@@ -2271,6 +2296,16 @@ const io=new IntersectionObserver(entries=>{ entries.forEach(e=>{ if(e.isInterse
 function attachReveals(){ document.querySelectorAll('.reveal').forEach(r=>io.observe(r)); }
 
 /* ════════════════════════════════════════════════════════
+   PASSWORD SHOW / HIDE
+════════════════════════════════════════════════════════ */
+function togglePw(eyeBtn){
+  const input = eyeBtn.previousElementSibling;
+  const isHidden = input.type === 'password';
+  input.type = isHidden ? 'text' : 'password';
+  eyeBtn.textContent = isHidden ? '🙈' : '👁';
+}
+
+/* ════════════════════════════════════════════════════════
    TOAST
 ════════════════════════════════════════════════════════ */
 let toastT;
@@ -2289,6 +2324,9 @@ function handleSubscribe(e){ e.preventDefault(); e.target.querySelector('input')
    INIT
 ════════════════════════════════════════════════════════ */
 initData().then(()=>{
+  updateMenuFooter();   /* show user name in menu if session was restored */
+  updateCartBadge();
+  updateWishBadge();
   showView('shop');
   checkAdminHash();
   setTimeout(attachReveals, 200);
