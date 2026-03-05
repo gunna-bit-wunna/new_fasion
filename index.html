@@ -1322,88 +1322,201 @@ footer{padding-bottom:max(32px,env(safe-area-inset-bottom,16px));}
   </main>
 </div>
 
+<!-- Firebase Compat SDK (v9 compat — works in plain HTML files) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
 <script>
-/* ════════════════════════════════════════
-   DATABASE (localStorage — ready to swap for real API)
-════════════════════════════════════════ */
-const DB={
-  get(k){try{return JSON.parse(localStorage.getItem('mn4_'+k));}catch{return null;}},
-  set(k,v){localStorage.setItem('mn4_'+k,JSON.stringify(v));},
-  /* Broadcast product changes so all open tabs/users see live updates */
-  broadcast(k){
-    try{
-      const ev=new StorageEvent('storage',{key:'mn4_'+k});
-      /* update timestamp so listeners can compare */
-      localStorage.setItem('mn4__lastUpdate',JSON.stringify({key:k,ts:Date.now()}));
-    }catch(e){}
-  }
+/* ════════════════════════════════════════════════════════
+   ██████╗  ██████╗██████╗ ███████╗
+   ██╔══██╗██╔════╝██╔══██╗██╔════╝
+   ██████╔╝██║     ██║  ██║███████╗
+   ██╔═══╝ ██║     ██║  ██║╚════██║
+   ██║     ╚██████╗██████╔╝███████║
+   ╚═╝      ╚═════╝╚═════╝ ╚══════╝
+   MAISON NOIR — Full Firebase Integration
+   Products & categories live-sync across
+   ALL devices in real time.
+════════════════════════════════════════════════════════ */
+
+/* ─────────────────────────────────────────────────────
+   STEP 1 — PASTE YOUR FIREBASE CONFIG HERE
+   How to get it:
+   1. Go to https://console.firebase.google.com
+   2. Click "Add project" (or open existing)
+   3. Click the </> Web icon → Register app
+   4. Copy the firebaseConfig object below
+   5. Go to Build → Realtime Database
+      → Create database → Start in TEST mode
+   ───────────────────────────────────────────────────── */
+const firebaseConfig = {
+  apiKey:            "AIzaSyCC2wH09Jn2FolOvg0FALqer78salO-S10",
+  authDomain:        "gunna-7ec93.firebaseapp.com",
+  databaseURL:       "https://gunna-7ec93-default-rtdb.firebaseio.com",
+  projectId:         "gunna-7ec93",
+  storageBucket:     "gunna-7ec93.firebasestorage.app",
+  messagingSenderId: "825041447117",
+  appId:             "1:825041447117:web:c29380e077946286d72184",
+  measurementId:     "G-2HXBYFR80S"
 };
 
-/* Listen for product updates from other sessions (admin adds items) */
-window.addEventListener('storage',e=>{
-  if(e.key&&e.key.startsWith('mn4_')){
-    const k=e.key.slice(4);
-    if(k==='products'||k==='categories'){
-      renderShop();
-      checkNewArrivals();
+/* ─────────────────────────────────────────────────────
+   FIREBASE SETUP
+   ───────────────────────────────────────────────────── */
+let _db = null;
+let _firebaseReady = false;
+
+function initFirebase() {
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    _db = firebase.database();
+    _firebaseReady = true;
+    console.log('%c Firebase connected ✓', 'color:#56c48b;font-weight:bold;');
+  } catch(e) {
+    console.warn('Firebase not configured yet. Using local data.', e.message);
+    _firebaseReady = false;
+  }
+}
+
+/* ─────────────────────────────────────────────────────
+   IN-MEMORY CACHE
+   Firebase listeners write here → UI reads from here
+   ───────────────────────────────────────────────────── */
+let _cache = {
+  products:   [],
+  categories: ['Women','Men','Accessories','Jewellery'],
+  settings:   { storeName:'MAISON NOIR', tagline:'Luxury Fashion House', currency:'€' }
+};
+
+/* ─────────────────────────────────────────────────────
+   LOCAL STORAGE — only for user accounts, admin
+   credentials and "seen products" (these stay private
+   per device and never go to Firebase)
+   ───────────────────────────────────────────────────── */
+const LS = {
+  get(k){ try{ return JSON.parse(localStorage.getItem('mn4_'+k)); }catch{ return null; } },
+  set(k,v){ localStorage.setItem('mn4_'+k, JSON.stringify(v)); }
+};
+
+/* ─────────────────────────────────────────────────────
+   GETTERS — all UI reads through these
+   ───────────────────────────────────────────────────── */
+const getProducts     = () => _cache.products;
+const getCategories   = () => _cache.categories;
+const getSettings     = () => _cache.settings;
+const getAdminCreds   = () => LS.get('adminCreds')   || { user:'admin', pass:'admin123' };
+const getUsers        = () => LS.get('users')         || [];
+const getSeenProducts = () => LS.get('seenProducts')  || [];
+
+/* ─────────────────────────────────────────────────────
+   FIREBASE WRITE HELPERS (all return Promises)
+   ───────────────────────────────────────────────────── */
+const fbSet    = (path, val)  => _db ? _db.ref(path).set(val)    : Promise.resolve();
+const fbUpdate = (path, val)  => _db ? _db.ref(path).update(val) : Promise.resolve();
+const fbRemove = (path)       => _db ? _db.ref(path).remove()    : Promise.resolve();
+
+/* ─────────────────────────────────────────────────────
+   REAL-TIME LISTENERS
+   Fire the moment admin saves anything — all open
+   browsers/phones update automatically
+   ───────────────────────────────────────────────────── */
+function attachListeners() {
+  if (!_db) return;
+
+  /* ── Products listener ── */
+  _db.ref('products').on('value', snap => {
+    const raw = snap.val();
+    if (raw) {
+      _cache.products = Object.values(raw)
+        .sort((a,b) => (b.addedAt||0) - (a.addedAt||0));
+    } else {
+      _cache.products = [];
     }
-  }
-});
+    refreshActiveView();
+  });
 
-/* Poll for changes every 30s (catches same-device admin updates) */
-let _lastProductHash='';
-function pollForUpdates(){
-  const raw=localStorage.getItem('mn4_products');
-  if(raw&&raw!==_lastProductHash){
-    _lastProductHash=raw;
-    renderShop();checkNewArrivals();
-  }
-}
-setInterval(pollForUpdates,30000);
+  /* ── Categories listener ── */
+  _db.ref('categories').on('value', snap => {
+    const raw = snap.val();
+    _cache.categories = raw
+      ? (Array.isArray(raw) ? raw : Object.values(raw))
+      : ['Women','Men','Accessories','Jewellery'];
+    refreshActiveView();
+  });
 
-function initData(){
-  if(!DB.get('products')) DB.set('products',[
-    {id:'p1',name:'Silk Evening Gown',brand:'Maison Noir',category:'Women',price:2850,oldPrice:null,tag:'new',desc:'A timeless gown in pure silk.',image:'',colors:['#1a1a1a','#c9a96e','#8b7355'],visible:true,addedAt:Date.now()-86400000*10},
-    {id:'p2',name:'Wool Blazer',brand:'Maison Noir',category:'Men',price:1490,oldPrice:1890,tag:'exclusive',desc:'Sharp tailoring in premium wool.',image:'',colors:['#0a1628','#2c2c2c'],visible:true,addedAt:Date.now()-86400000*8},
-    {id:'p3',name:'Leather Tote Bag',brand:'Maison Noir',category:'Accessories',price:980,oldPrice:null,tag:'',desc:'Hand-stitched full-grain leather.',image:'',colors:['#c9a96e','#1a1a1a'],visible:true,addedAt:Date.now()-86400000*5},
-    {id:'p4',name:'Velvet Midi Dress',brand:'Maison Noir',category:'Women',price:720,oldPrice:1200,tag:'sale',desc:'Luxurious velvet in deep jewel tones.',image:'',colors:['#6b2d4a','#1a1a2e'],visible:true,addedAt:Date.now()-86400000*3},
-    {id:'p5',name:'Cashmere Scarf',brand:'Maison Noir',category:'Accessories',price:380,oldPrice:null,tag:'new',desc:'Pure Mongolian cashmere.',image:'',colors:['#c9a96e','#f5f2ee','#1a1a1a'],visible:true,addedAt:Date.now()-86400000*2},
-    {id:'p6',name:'Tailored Trousers',brand:'Maison Noir',category:'Men',price:650,oldPrice:null,tag:'',desc:'Precision-cut in Italian wool-blend.',image:'',colors:['#1a1a1a','#2c2c2c'],visible:true,addedAt:Date.now()-86400000*1},
-  ]);
-  if(!DB.get('categories')) DB.set('categories',['Women','Men','Accessories','Jewellery']);
-  if(!DB.get('adminCreds')) DB.set('adminCreds',{user:'admin',pass:'admin123'});
-  if(!DB.get('settings')) DB.set('settings',{storeName:'MAISON NOIR',tagline:'Luxury Fashion House',currency:'€'});
-  if(!DB.get('users')) DB.set('users',[]);
-  /* track "seen" product IDs so we can highlight new ones */
-  if(!DB.get('seenProducts')) DB.set('seenProducts',[]);
-  _lastProductHash=localStorage.getItem('mn4_products')||'';
+  /* ── Settings listener ── */
+  _db.ref('settings').on('value', snap => {
+    if (snap.val()) _cache.settings = snap.val();
+  });
 }
 
-const getProducts=()=>DB.get('products')||[];
-const getCategories=()=>DB.get('categories')||[];
-const getSettings=()=>DB.get('settings')||{currency:'€'};
-const getAdminCreds=()=>DB.get('adminCreds')||{user:'admin',pass:'admin123'};
-const getUsers=()=>DB.get('users')||[];
-const getSeenProducts=()=>DB.get('seenProducts')||[];
+/* Re-render whichever view is showing right now */
+function refreshActiveView() {
+  if (document.getElementById('shopView')?.classList.contains('active'))  {
+    renderShop(); checkNewArrivals();
+  }
+  if (document.getElementById('adminView')?.classList.contains('active')) {
+    renderProductsTable(); updateAdminDashboard();
+  }
+}
 
-/* ════════════════════════════════════════
+/* ─────────────────────────────────────────────────────
+   INIT — seed default data if Firebase is empty
+   ───────────────────────────────────────────────────── */
+const DEFAULT_PRODUCTS = {
+  p1:{ id:'p1', name:'Silk Evening Gown',   brand:'Maison Noir', category:'Women',       price:2850, oldPrice:null, tag:'new',       desc:'A timeless gown in pure silk.',               image:'', colors:['#1a1a1a','#c9a96e','#8b7355'], visible:true, addedAt:Date.now()-864000000 },
+  p2:{ id:'p2', name:'Wool Blazer',         brand:'Maison Noir', category:'Men',         price:1490, oldPrice:1890, tag:'exclusive',  desc:'Sharp tailoring in premium wool.',             image:'', colors:['#0a1628','#2c2c2c'],           visible:true, addedAt:Date.now()-691200000 },
+  p3:{ id:'p3', name:'Leather Tote Bag',    brand:'Maison Noir', category:'Accessories', price:980,  oldPrice:null, tag:'',           desc:'Hand-stitched full-grain leather.',            image:'', colors:['#c9a96e','#1a1a1a'],           visible:true, addedAt:Date.now()-432000000 },
+  p4:{ id:'p4', name:'Velvet Midi Dress',   brand:'Maison Noir', category:'Women',       price:720,  oldPrice:1200, tag:'sale',       desc:'Luxurious velvet in deep jewel tones.',        image:'', colors:['#6b2d4a','#1a1a2e'],           visible:true, addedAt:Date.now()-259200000 },
+  p5:{ id:'p5', name:'Cashmere Scarf',      brand:'Maison Noir', category:'Accessories', price:380,  oldPrice:null, tag:'new',        desc:'Pure Mongolian cashmere.',                     image:'', colors:['#c9a96e','#f5f2ee','#1a1a1a'], visible:true, addedAt:Date.now()-172800000 },
+  p6:{ id:'p6', name:'Tailored Trousers',   brand:'Maison Noir', category:'Men',         price:650,  oldPrice:null, tag:'',           desc:'Precision-cut in Italian wool-blend.',         image:'', colors:['#1a1a1a','#2c2c2c'],           visible:true, addedAt:Date.now()-86400000  },
+};
+
+async function initData() {
+  /* Always init local-only stores */
+  if (!LS.get('adminCreds'))   LS.set('adminCreds',   { user:'admin', pass:'admin123' });
+  if (!LS.get('users'))        LS.set('users',        []);
+  if (!LS.get('seenProducts')) LS.set('seenProducts', []);
+
+  initFirebase();
+
+  if (!_firebaseReady) {
+    /* Firebase not yet configured — load demo data locally so site isn't empty */
+    _cache.products   = Object.values(DEFAULT_PRODUCTS);
+    _cache.categories = ['Women','Men','Accessories','Jewellery'];
+    return;
+  }
+
+  /* Check if Firebase has products yet */
+  const snap = await _db.ref('products').once('value');
+  if (!snap.exists()) {
+    /* First-ever launch — seed defaults into Firebase */
+    await _db.ref('products').set(DEFAULT_PRODUCTS);
+    await _db.ref('categories').set(['Women','Men','Accessories','Jewellery']);
+    await _db.ref('settings').set({ storeName:'MAISON NOIR', tagline:'Luxury Fashion House', currency:'€' });
+    console.log('Default data seeded into Firebase ✓');
+  }
+
+  /* Attach live listeners — from now on everything is real-time */
+  attachListeners();
+}
+
+/* ════════════════════════════════════════════════════════
    STATE
-════════════════════════════════════════ */
-let currentUser=null,cart=[],wishlist=[],activeCat='all',adminCatFilter='all';
+════════════════════════════════════════════════════════ */
+let currentUser=null, cart=[], wishlist=[], activeCat='all', adminCatFilter='all';
 
-/* ════════════════════════════════════════
+/* ════════════════════════════════════════════════════════
    NEW ARRIVALS DETECTION
-════════════════════════════════════════ */
+════════════════════════════════════════════════════════ */
 function checkNewArrivals(){
-  const seen=new Set(getSeenProducts());
-  const products=getProducts().filter(p=>p.visible);
-  const newItems=products.filter(p=>!seen.has(p.id));
-  const banner=document.getElementById('newBanner');
-  const countEl=document.getElementById('newBannerCount');
-  if(newItems.length>0&&banner){
+  const seen    = new Set(getSeenProducts());
+  const newItems= getProducts().filter(p=>p.visible && !seen.has(p.id));
+  const banner  = document.getElementById('newBanner');
+  const countEl = document.getElementById('newBannerCount');
+  if(newItems.length>0 && banner){
     banner.style.display='flex';
-    if(countEl) countEl.textContent=newItems.length+' New';
-    /* Set onclick to scroll to catalogue and highlight new items */
+    if(countEl) countEl.textContent = newItems.length+' New';
     banner.onclick=()=>{
       document.getElementById('catalogue')?.scrollIntoView({behavior:'smooth'});
       filterCat('__new__',null);
@@ -1414,33 +1527,31 @@ function checkNewArrivals(){
 }
 
 function markAllSeen(){
-  const ids=getProducts().map(p=>p.id);
-  DB.set('seenProducts',ids);
+  LS.set('seenProducts', getProducts().map(p=>p.id));
   const banner=document.getElementById('newBanner');
   if(banner) banner.style.display='none';
 }
 
-/* ════════════════════════════════════════
+/* ════════════════════════════════════════════════════════
    VIEW ROUTING
-════════════════════════════════════════ */
+════════════════════════════════════════════════════════ */
 function showView(v){
   document.querySelectorAll('.view').forEach(el=>el.classList.remove('active'));
   document.getElementById(v+'View').classList.add('active');
   window.scrollTo(0,0);
-  if(v==='shop'){renderShop();updateMenuFooter();checkNewArrivals();}
-  if(v==='admin'){renderAdminPanel();}
-  if(v==='profile'){renderProfile();}
+  if(v==='shop')   { renderShop(); updateMenuFooter(); checkNewArrivals(); }
+  if(v==='admin')  { renderAdminPanel(); }
+  if(v==='profile'){ renderProfile(); }
 }
 
-function scrollTo(id){document.getElementById(id)?.scrollIntoView({behavior:'smooth'});}
+function scrollTo(id){ document.getElementById(id)?.scrollIntoView({behavior:'smooth'}); }
 
-/* ════════════════════════════════════════
+/* ════════════════════════════════════════════════════════
    MENU
-════════════════════════════════════════ */
-document.getElementById('hamburgerBtn').addEventListener('click',toggleMenu);
+════════════════════════════════════════════════════════ */
+document.getElementById('hamburgerBtn').addEventListener('click', toggleMenu);
 function toggleMenu(){
-  const open=document.getElementById('slideMenu').classList.contains('open');
-  open?closeMenu():openMenu();
+  document.getElementById('slideMenu').classList.contains('open') ? closeMenu() : openMenu();
 }
 function openMenu(){
   document.getElementById('slideMenu').classList.add('open');
@@ -1456,8 +1567,7 @@ function closeMenu(){
 }
 
 function updateMenuFooter(){
-  const footer=document.getElementById('menuFooter');
-  if(!footer)return;
+  const footer=document.getElementById('menuFooter'); if(!footer)return;
   if(currentUser){
     const init=(currentUser.firstName[0]+(currentUser.lastName?.[0]||'')).toUpperCase();
     footer.innerHTML=`
@@ -1467,125 +1577,126 @@ function updateMenuFooter(){
       </div>
       <button class="btn-secondary full" onclick="showView('profile');closeMenu()"><span>My Profile</span></button>
       <button class="btn-danger full" onclick="doUserLogout();closeMenu()">Sign Out</button>`;
-  }else{
+  } else {
     footer.innerHTML=`
       <button class="btn-primary full" onclick="showView('login');closeMenu()"><span>Sign In</span></button>
       <button class="btn-secondary full" onclick="showView('register');closeMenu()">Create Account</button>`;
   }
 }
 
-/* ════════════════════════════════════════
-   USER AUTH
-════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════
+   USER AUTH (localStorage — private per device)
+════════════════════════════════════════════════════════ */
 function doUserLogin(){
   const email=document.getElementById('loginEmail').value.trim().toLowerCase();
-  const pass=document.getElementById('loginPassword').value;
-  const user=getUsers().find(u=>u.email===email&&u.password===pass);
-  if(!user){document.getElementById('loginError').classList.add('show');return;}
+  const pass =document.getElementById('loginPassword').value;
+  const user =getUsers().find(u=>u.email===email && u.password===pass);
+  if(!user){ document.getElementById('loginError').classList.add('show'); return; }
   document.getElementById('loginError').classList.remove('show');
-  currentUser=user;cart=user.cart||[];wishlist=user.wishlist||[];
-  showView('shop');showToast(`Welcome back, ${user.firstName}!`);
-  updateMenuFooter();updateCartBadge();updateWishBadge();
+  currentUser=user; cart=user.cart||[]; wishlist=user.wishlist||[];
+  showView('shop'); showToast(`Welcome back, ${user.firstName}!`);
+  updateMenuFooter(); updateCartBadge(); updateWishBadge();
 }
-document.getElementById('loginPassword').addEventListener('keydown',e=>{if(e.key==='Enter')doUserLogin();});
+document.getElementById('loginPassword').addEventListener('keydown',e=>{ if(e.key==='Enter') doUserLogin(); });
 
 function doRegister(){
-  const first=document.getElementById('regFirst').value.trim();
-  const last=document.getElementById('regLast').value.trim();
-  const email=document.getElementById('regEmail').value.trim().toLowerCase();
-  const phone=document.getElementById('regPhone').value.trim();
-  const pass=document.getElementById('regPassword').value;
+  const first  =document.getElementById('regFirst').value.trim();
+  const last   =document.getElementById('regLast').value.trim();
+  const email  =document.getElementById('regEmail').value.trim().toLowerCase();
+  const phone  =document.getElementById('regPhone').value.trim();
+  const pass   =document.getElementById('regPassword').value;
   const confirm=document.getElementById('regConfirm').value;
-  const err=document.getElementById('registerError');
-  if(!first||!last||!email||!pass){err.textContent='Please fill all required fields.';err.classList.add('show');return;}
-  if(pass.length<8){err.textContent='Password must be at least 8 characters.';err.classList.add('show');return;}
-  if(pass!==confirm){err.textContent='Passwords do not match.';err.classList.add('show');return;}
+  const err    =document.getElementById('registerError');
+  if(!first||!last||!email||!pass){ err.textContent='Please fill all required fields.'; err.classList.add('show'); return; }
+  if(pass.length<8){ err.textContent='Password must be at least 8 characters.'; err.classList.add('show'); return; }
+  if(pass!==confirm){ err.textContent='Passwords do not match.'; err.classList.add('show'); return; }
   const users=getUsers();
-  if(users.find(u=>u.email===email)){err.textContent='Account already exists with this email.';err.classList.add('show');return;}
+  if(users.find(u=>u.email===email)){ err.textContent='Account already exists with this email.'; err.classList.add('show'); return; }
   err.classList.remove('show');
-  const nu={email,firstName:first,lastName:last,phone,password:pass,address:'',city:'',country:'',joinDate:new Date().toLocaleDateString('en-GB',{year:'numeric',month:'long'}),cart:[],wishlist:[],orders:[]};
-  users.push(nu);DB.set('users',users);
-  currentUser=nu;cart=[];wishlist=[];
-  showView('shop');showToast(`Welcome to Maison Noir, ${first}!`);updateMenuFooter();
+  const nu={ email,firstName:first,lastName:last,phone,password:pass,
+             address:'',city:'',country:'',
+             joinDate:new Date().toLocaleDateString('en-GB',{year:'numeric',month:'long'}),
+             cart:[],wishlist:[],orders:[] };
+  users.push(nu); LS.set('users',users);
+  currentUser=nu; cart=[]; wishlist=[];
+  showView('shop'); showToast(`Welcome to Maison Noir, ${first}!`); updateMenuFooter();
 }
 
 function doUserLogout(){
-  saveUserData();currentUser=null;cart=[];wishlist=[];
-  updateMenuFooter();updateCartBadge();updateWishBadge();
-  showView('shop');showToast('Signed out successfully');
+  saveUserData(); currentUser=null; cart=[]; wishlist=[];
+  updateMenuFooter(); updateCartBadge(); updateWishBadge();
+  showView('shop'); showToast('Signed out successfully');
 }
 
 function saveUserData(){
-  if(!currentUser)return;
+  if(!currentUser) return;
   const users=getUsers();
   const idx=users.findIndex(u=>u.email===currentUser.email);
-  if(idx>-1){users[idx]={...users[idx],...currentUser,cart,wishlist};DB.set('users',users);currentUser=users[idx];}
+  if(idx>-1){ users[idx]={...users[idx],...currentUser,cart,wishlist}; LS.set('users',users); currentUser=users[idx]; }
 }
 
-function handleAuthNav(){currentUser?showView('profile'):showView('login');}
+function handleAuthNav(){ currentUser ? showView('profile') : showView('login'); }
 
 function checkPassStrength(v){
   const bar=document.getElementById('passStrength');
-  let s=0;if(v.length>=8)s++;if(/[A-Z]/.test(v))s++;if(/[0-9]/.test(v))s++;if(/[^a-zA-Z0-9]/.test(v))s++;
-  const c=['#e05c5c','#e0955c','#e0c65c','#56c48b'],w=['25%','50%','75%','100%'];
-  bar.style.width=v?w[s-1]||'10%':'0';bar.style.background=v?c[s-1]||'var(--red)':'transparent';
+  let s=0; if(v.length>=8)s++; if(/[A-Z]/.test(v))s++; if(/[0-9]/.test(v))s++; if(/[^a-zA-Z0-9]/.test(v))s++;
+  const c=['#e05c5c','#e0955c','#e0c65c','#56c48b'], w=['25%','50%','75%','100%'];
+  bar.style.width=v?w[s-1]||'10%':'0'; bar.style.background=v?c[s-1]||'var(--red)':'transparent';
 }
 
-/* ════════════════════════════════════════
-   ADMIN ACCESS — URL link ONLY
-   Visit: yourwebsite.com#admin
-   No other way to access admin panel.
-════════════════════════════════════════ */
-function checkAdminHash(){
-  if(window.location.hash==='#admin'){
-    history.replaceState(null,'',window.location.pathname); /* clean URL */
-    showView('adminLogin');
-  }
-}
-window.addEventListener('hashchange', checkAdminHash);
-
+/* ════════════════════════════════════════════════════════
+   ADMIN AUTH
+════════════════════════════════════════════════════════ */
 function doAdminLogin(){
   const u=document.getElementById('adminLoginUser').value.trim();
   const p=document.getElementById('adminLoginPass').value;
   const c=getAdminCreds();
-  if(u===c.user&&p===c.pass){document.getElementById('adminUserName').textContent=u;document.getElementById('adminLoginError').classList.remove('show');showView('admin');}
-  else document.getElementById('adminLoginError').classList.add('show');
+  if(u===c.user && p===c.pass){
+    document.getElementById('adminUserName').textContent=u;
+    document.getElementById('adminLoginError').classList.remove('show');
+    showView('admin');
+  } else {
+    document.getElementById('adminLoginError').classList.add('show');
+  }
 }
-document.getElementById('adminLoginPass').addEventListener('keydown',e=>{if(e.key==='Enter')doAdminLogin();});
-function doAdminLogout(){showView('shop');}
+document.getElementById('adminLoginPass').addEventListener('keydown',e=>{ if(e.key==='Enter') doAdminLogin(); });
+function doAdminLogout(){ showView('shop'); }
 
-/* ════════════════════════════════════════
+/* ════════════════════════════════════════════════════════
    CART
-════════════════════════════════════════ */
-function openCart(){renderCartDrawer();document.getElementById('cartOverlay').classList.add('open');document.getElementById('cartDrawer').classList.add('open');document.body.style.overflow='hidden';}
-function closeCart(){document.getElementById('cartOverlay').classList.remove('open');document.getElementById('cartDrawer').classList.remove('open');document.body.style.overflow='';}
-function openWishlist(){renderWishlistDrawer();document.getElementById('wishlistOverlay').classList.add('open');document.getElementById('wishlistDrawer').classList.add('open');document.body.style.overflow='hidden';}
-function closeWishlist(){document.getElementById('wishlistOverlay').classList.remove('open');document.getElementById('wishlistDrawer').classList.remove('open');document.body.style.overflow='';}
+════════════════════════════════════════════════════════ */
+function openCart(){ renderCartDrawer(); document.getElementById('cartOverlay').classList.add('open'); document.getElementById('cartDrawer').classList.add('open'); document.body.style.overflow='hidden'; }
+function closeCart(){ document.getElementById('cartOverlay').classList.remove('open'); document.getElementById('cartDrawer').classList.remove('open'); document.body.style.overflow=''; }
+function openWishlist(){ renderWishlistDrawer(); document.getElementById('wishlistOverlay').classList.add('open'); document.getElementById('wishlistDrawer').classList.add('open'); document.body.style.overflow='hidden'; }
+function closeWishlist(){ document.getElementById('wishlistOverlay').classList.remove('open'); document.getElementById('wishlistDrawer').classList.remove('open'); document.body.style.overflow=''; }
 
 function addToCart(id){
-  if(!currentUser){showToast('Please sign in to add items');showView('login');return;}
+  if(!currentUser){ showToast('Please sign in to add items'); showView('login'); return; }
   const ex=cart.find(i=>i.productId===id);
-  if(ex)ex.qty++;else cart.push({productId:id,qty:1});
-  saveUserData();updateCartBadge();
+  if(ex) ex.qty++; else cart.push({productId:id,qty:1});
+  saveUserData(); updateCartBadge();
   const p=getProducts().find(x=>x.id===id);
   showToast(p?`"${p.name}" added to cart`:'Added to cart');
   pulseBadge('cartBadge');
 }
-function removeFromCart(id){cart=cart.filter(i=>i.productId!==id);saveUserData();updateCartBadge();renderCartDrawer();showToast('Removed from cart');}
-function updateQty(id,d){const it=cart.find(i=>i.productId===id);if(!it)return;it.qty=Math.max(1,it.qty+d);saveUserData();updateCartBadge();renderCartDrawer();}
+function removeFromCart(id){ cart=cart.filter(i=>i.productId!==id); saveUserData(); updateCartBadge(); renderCartDrawer(); showToast('Removed from cart'); }
+function updateQty(id,d){ const it=cart.find(i=>i.productId===id); if(!it)return; it.qty=Math.max(1,it.qty+d); saveUserData(); updateCartBadge(); renderCartDrawer(); }
 function updateCartBadge(){
   const t=cart.reduce((s,i)=>s+i.qty,0);
-  ['cartBadge','profileCartBadge'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=t;});
+  ['cartBadge','profileCartBadge'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent=t; });
 }
-function pulseBadge(id){const el=document.getElementById(id);if(!el)return;el.classList.remove('pulse');void el.offsetWidth;el.classList.add('pulse');}
+function pulseBadge(id){ const el=document.getElementById(id); if(!el)return; el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); }
 
 function renderCartDrawer(){
-  const body=document.getElementById('cartBody'),foot=document.getElementById('cartFooter');
+  const body=document.getElementById('cartBody'), foot=document.getElementById('cartFooter');
   const cur=getSettings().currency||'€';
-  if(!cart.length){body.innerHTML=`<div class="cart-empty-msg"><div class="ico">⊕</div><p>Cart is empty</p><small>Explore our collections</small></div>`;foot.style.display='none';return;}
-  const products=getProducts();let total=0;
+  if(!cart.length){
+    body.innerHTML=`<div class="cart-empty-msg"><div class="ico">⊕</div><p>Cart is empty</p><small>Explore our collections</small></div>`;
+    foot.style.display='none'; return;
+  }
+  const products=getProducts(); let total=0;
   body.innerHTML=cart.map(item=>{
-    const p=products.find(x=>x.id===item.productId);if(!p)return '';
+    const p=products.find(x=>x.id===item.productId); if(!p) return '';
     total+=p.price*item.qty;
     const img=p.image?`<img src="${p.image}" style="width:100%;height:100%;object-fit:cover;">`:p.name[0];
     return `<div class="cart-item">
@@ -1594,7 +1705,11 @@ function renderCartDrawer(){
         <div class="cart-name">${p.name}</div>
         <div class="cart-brand">${p.brand||'Maison Noir'}</div>
         <div class="cart-price">${cur} ${Number(p.price).toLocaleString()}</div>
-        <div class="qty-row"><button class="qty-btn" onclick="updateQty('${p.id}',-1)">−</button><span class="qty-val">${item.qty}</span><button class="qty-btn" onclick="updateQty('${p.id}',1)">+</button></div>
+        <div class="qty-row">
+          <button class="qty-btn" onclick="updateQty('${p.id}',-1)">−</button>
+          <span class="qty-val">${item.qty}</span>
+          <button class="qty-btn" onclick="updateQty('${p.id}',1)">+</button>
+        </div>
       </div>
       <button class="cart-del" onclick="removeFromCart('${p.id}')">✕</button>
     </div>`;
@@ -1604,36 +1719,36 @@ function renderCartDrawer(){
 }
 
 function handleCheckout(){
-  if(!currentUser){showView('login');return;}
-  const products=getProducts(),cur=getSettings().currency||'€';
-  const total=cart.reduce((s,i)=>{const p=products.find(x=>x.id===i.productId);return s+(p?p.price*i.qty:0);},0);
-  if(!currentUser.orders)currentUser.orders=[];
-  currentUser.orders.push({id:'ORD'+Date.now(),date:new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}),items:[...cart],total});
-  cart=[];saveUserData();updateCartBadge();closeCart();
+  if(!currentUser){ showView('login'); return; }
+  const products=getProducts(), cur=getSettings().currency||'€';
+  const total=cart.reduce((s,i)=>{ const p=products.find(x=>x.id===i.productId); return s+(p?p.price*i.qty:0); },0);
+  if(!currentUser.orders) currentUser.orders=[];
+  currentUser.orders.push({ id:'ORD'+Date.now(), date:new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}), items:[...cart], total });
+  cart=[]; saveUserData(); updateCartBadge(); closeCart();
   showToast('Order placed! Thank you for shopping with Maison Noir 🎉');
 }
 
-/* ════════════════════════════════════════
+/* ════════════════════════════════════════════════════════
    WISHLIST
-════════════════════════════════════════ */
+════════════════════════════════════════════════════════ */
 function toggleWishlist(id){
-  if(!currentUser){showToast('Please sign in to save items');showView('login');return;}
+  if(!currentUser){ showToast('Please sign in to save items'); showView('login'); return; }
   const idx=wishlist.indexOf(id);
-  if(idx>-1)wishlist.splice(idx,1);else{wishlist.push(id);pulseBadge('wishBadge');}
-  saveUserData();updateWishBadge();renderShopProducts(activeCat);
+  if(idx>-1) wishlist.splice(idx,1); else { wishlist.push(id); pulseBadge('wishBadge'); }
+  saveUserData(); updateWishBadge(); renderShopProducts(activeCat);
   const p=getProducts().find(x=>x.id===id);
   showToast(idx>-1?'Removed from wishlist':`"${p?.name}" saved to wishlist`);
 }
 function updateWishBadge(){
-  const b=document.getElementById('wishBadge');if(!b)return;
-  b.textContent=wishlist.length;b.classList.toggle('on',wishlist.length>0);
+  const b=document.getElementById('wishBadge'); if(!b)return;
+  b.textContent=wishlist.length; b.classList.toggle('on',wishlist.length>0);
 }
 function renderWishlistDrawer(){
-  const body=document.getElementById('wishlistBody'),cur=getSettings().currency||'€';
-  if(!wishlist.length){body.innerHTML=`<div class="cart-empty-msg"><div class="ico">♡</div><p>Wishlist is empty</p><small>Tap ♡ on any product</small></div>`;return;}
+  const body=document.getElementById('wishlistBody'), cur=getSettings().currency||'€';
+  if(!wishlist.length){ body.innerHTML=`<div class="cart-empty-msg"><div class="ico">♡</div><p>Wishlist is empty</p><small>Tap ♡ on any product</small></div>`; return; }
   const products=getProducts();
   body.innerHTML=wishlist.map(id=>{
-    const p=products.find(x=>x.id===id);if(!p)return '';
+    const p=products.find(x=>x.id===id); if(!p)return '';
     const img=p.image?`<img src="${p.image}" style="width:100%;height:100%;object-fit:cover;">`:p.name[0];
     return `<div class="cart-item">
       <div class="cart-thumb">${img}</div>
@@ -1648,28 +1763,26 @@ function renderWishlistDrawer(){
   }).join('');
 }
 
-/* ════════════════════════════════════════
+/* ════════════════════════════════════════════════════════
    SHOP RENDER
-════════════════════════════════════════ */
+════════════════════════════════════════════════════════ */
 function renderShop(){
-  renderCatChips();renderShopProducts(activeCat);renderFooterCats();renderMenuCats();
+  renderCatChips(); renderShopProducts(activeCat); renderFooterCats(); renderMenuCats();
   const ct=getProducts().filter(p=>p.visible).length;
-  ['totalPiecesStat','totalPiecesStat2'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent=ct+'+';});
+  ['totalPiecesStat','totalPiecesStat2'].forEach(id=>{ const el=document.getElementById(id); if(el) el.textContent=ct+'+'; });
 }
 
 function renderCatChips(){
-  const cats=getCategories(),el=document.getElementById('catChips');
-  if(!el)return;
+  const cats=getCategories(), el=document.getElementById('catChips'); if(!el)return;
   el.innerHTML=`<button class="cat-chip ${activeCat==='all'?'active':''}" onclick="filterCat('all',this)">All</button>`;
-  cats.forEach(c=>{el.innerHTML+=`<button class="cat-chip ${activeCat===c?'active':''}" onclick="filterCat('${c}',this)">${c}</button>`;});
-  /* New arrivals chip */
+  cats.forEach(c=>{ el.innerHTML+=`<button class="cat-chip ${activeCat===c?'active':''}" onclick="filterCat('${c}',this)">${c}</button>`; });
   const seen=new Set(getSeenProducts());
   const newCount=getProducts().filter(p=>p.visible&&!seen.has(p.id)).length;
   if(newCount>0) el.innerHTML+=`<button class="cat-chip ${activeCat==='__new__'?'active':''}" onclick="filterCat('__new__',this)" style="border-color:var(--green);color:${activeCat==='__new__'?'var(--black)':'var(--green)'}">🔥 New (${newCount})</button>`;
 }
 
 function renderMenuCats(){
-  const cats=getCategories(),el=document.getElementById('menuCatLinks');if(!el)return;
+  const cats=getCategories(), el=document.getElementById('menuCatLinks'); if(!el)return;
   el.innerHTML=cats.map(c=>`<button class="menu-item ${activeCat===c?'active':''}" onclick="filterCat('${c}',null);closeMenu()"><span class="menu-item-icon">◈</span>${c}</button>`).join('');
 }
 
@@ -1684,22 +1797,19 @@ function filterCat(cat,btn){
 }
 
 function renderShopProducts(cat){
-  const grid=document.getElementById('shopGrid');if(!grid)return;
+  const grid=document.getElementById('shopGrid'); if(!grid)return;
   const seen=new Set(getSeenProducts());
   let products=getProducts().filter(p=>p.visible);
-  if(cat==='__new__') products=products.filter(p=>!seen.has(p.id));
+  if(cat==='__new__')  products=products.filter(p=>!seen.has(p.id));
   else if(cat!=='all') products=products.filter(p=>p.category===cat);
   const cur=getSettings().currency||'€';
   if(!products.length){
     grid.innerHTML=`<div class="products-empty"><p>${cat==='__new__'?'All caught up!':'No products here yet'}</p><small>${cat==='__new__'?'You\'ve seen all new items':'Check back soon'}</small></div>`;
     return;
   }
-  /* Sort: newest first */
-  products.sort((a,b)=>(b.addedAt||0)-(a.addedAt||0));
   grid.innerHTML=products.map(p=>{
     const isNew=!seen.has(p.id);
     const tagHtml=p.tag?`<span class="product-tag ${p.tag}">${p.tag.charAt(0).toUpperCase()+p.tag.slice(1)}</span>`:'';
-    const newDotHtml=isNew&&!p.tag?`<span class="new-pulse"></span>`:'';
     const oldHtml=p.oldPrice?`<span class="price-old">${cur} ${Number(p.oldPrice).toLocaleString()}</span>`:'';
     const colors=(p.colors||[]).map(c=>`<div class="clr" style="background:${c}"></div>`).join('');
     const imgHtml=p.image?`<img class="product-img" src="${p.image}" alt="${p.name}" loading="lazy">`:`<div class="product-placeholder">${p.name[0]}</div>`;
@@ -1708,7 +1818,7 @@ function renderShopProducts(cat){
       <div class="product-img-wrap">
         ${imgHtml}
         ${tagHtml}
-        ${isNew&&p.tag?`<span class="product-tag new-item" style="top:${p.tag?'34px':'10px'};">✦ New</span>`:''}
+        ${isNew&&p.tag?`<span class="product-tag new-item" style="top:34px;">✦ New</span>`:''}
         <button class="product-wish-btn${isWished?' active':''}" onclick="toggleWishlist('${p.id}')">${isWished?'♥':'♡'}</button>
       </div>
       <div class="product-info">
@@ -1726,16 +1836,16 @@ function renderShopProducts(cat){
 }
 
 function renderFooterCats(){
-  const el=document.getElementById('footerCats');if(!el)return;
+  const el=document.getElementById('footerCats'); if(!el)return;
   el.innerHTML=getCategories().map(c=>`<li><a onclick="filterCat('${c}',null);scrollTo('catalogue')">${c}</a></li>`).join('');
 }
 
-/* ════════════════════════════════════════
+/* ════════════════════════════════════════════════════════
    PROFILE
-════════════════════════════════════════ */
+════════════════════════════════════════════════════════ */
 function renderProfile(){
-  if(!currentUser){showView('login');return;}
-  const u=currentUser,cur=getSettings().currency||'€';
+  if(!currentUser){ showView('login'); return; }
+  const u=currentUser, cur=getSettings().currency||'€';
   const init=(u.firstName[0]+(u.lastName?.[0]||'')).toUpperCase();
   document.getElementById('profileAvatar').textContent=init;
   document.getElementById('profileName').textContent=`${u.firstName} ${u.lastName}`;
@@ -1756,21 +1866,30 @@ function renderProfile(){
     <div class="info-field"><div class="ifl">Country</div><div class="ifv">${u.country||'—'}</div></div>
     <div class="info-field"><div class="ifl">Member Since</div><div class="ifv">${u.joinDate}</div></div>`;
   if(cart.length){
-    const total=cart.reduce((s,i)=>{const p=products.find(x=>x.id===i.productId);return s+(p?p.price*i.qty:0);},0);
+    const total=cart.reduce((s,i)=>{ const p=products.find(x=>x.id===i.productId); return s+(p?p.price*i.qty:0); },0);
     document.getElementById('profileCartSummary').innerHTML=cart.slice(0,3).map(item=>{
-      const p=products.find(x=>x.id===item.productId);if(!p)return '';
+      const p=products.find(x=>x.id===item.productId); if(!p)return '';
       return `<div class="cart-item">
         <div class="cart-thumb" style="width:52px;height:64px;">${p.image?`<img src="${p.image}" style="width:100%;height:100%;object-fit:cover;">`:p.name[0]}</div>
         <div class="cart-info"><div class="cart-name">${p.name}</div><div class="cart-price">${cur} ${Number(p.price).toLocaleString()}</div></div>
         <div style="font-size:10px;color:rgba(244,241,237,.38);">×${item.qty}</div>
       </div>`;
-    }).join('')+`<div style="text-align:right;padding:12px 0;font-family:'Cormorant Garamond',serif;font-size:17px;">Total: ${cur} ${total.toLocaleString()}</div>`;
+    }).join('')+`<div style="text-align:right;padding:12px 0;font-family:'Cormorant Garamond',serif;font-size:17px;">Total: ${cur} ${cart.reduce((s,i)=>{ const p=products.find(x=>x.id===i.productId); return s+(p?p.price*i.qty:0); },0).toLocaleString()}</div>`;
   } else {
     document.getElementById('profileCartSummary').innerHTML=`<div class="empty-msg" style="padding:24px;"><p>Cart is empty</p></div>`;
   }
   const orders=u.orders||[];
   document.getElementById('profileOrdersList').innerHTML=orders.length
-    ? [...orders].reverse().map(o=>{const items=o.items.map(i=>{const p=products.find(x=>x.id===i.productId);return p?`${p.name} ×${i.qty}`:''}).filter(Boolean).join(', ');return `<div class="order-row"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span class="order-id">${o.id}</span><span class="order-date">${o.date}</span></div><div class="order-items">${items}</div><div class="order-total">${(getSettings().currency||'€')} ${Number(o.total).toLocaleString()}</div></div>`;}).join('')
+    ? [...orders].reverse().map(o=>{
+        const items=o.items.map(i=>{ const p=products.find(x=>x.id===i.productId); return p?`${p.name} ×${i.qty}`:''; }).filter(Boolean).join(', ');
+        return `<div class="order-row">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+            <span class="order-id">${o.id}</span><span class="order-date">${o.date}</span>
+          </div>
+          <div class="order-items">${items}</div>
+          <div class="order-total">${cur} ${Number(o.total).toLocaleString()}</div>
+        </div>`;
+      }).join('')
     : `<div class="empty-msg"><p>No orders yet</p><small>Your order history will appear here</small></div>`;
   renderProfileWishlist();
   document.getElementById('editFirst').value=u.firstName||'';
@@ -1783,10 +1902,10 @@ function renderProfile(){
 }
 
 function renderProfileWishlist(){
-  const grid=document.getElementById('profileWishGrid'),cur=getSettings().currency||'€',products=getProducts();
-  if(!wishlist.length){grid.innerHTML=`<div class="empty-msg" style="grid-column:1/-1;"><p>Wishlist empty</p><small>Tap ♡ on products</small></div>`;return;}
+  const grid=document.getElementById('profileWishGrid'), cur=getSettings().currency||'€', products=getProducts();
+  if(!wishlist.length){ grid.innerHTML=`<div class="empty-msg" style="grid-column:1/-1;"><p>Wishlist empty</p><small>Tap ♡ on products</small></div>`; return; }
   grid.innerHTML=wishlist.map(id=>{
-    const p=products.find(x=>x.id===id);if(!p)return '';
+    const p=products.find(x=>x.id===id); if(!p)return '';
     return `<div class="wl-card">
       <div class="wl-img">${p.image?`<img src="${p.image}" style="width:100%;height:100%;object-fit:cover;">`:p.name[0]}</div>
       <button class="wl-rem" onclick="toggleWishlist('${p.id}');renderProfileWishlist()">✕</button>
@@ -1805,22 +1924,22 @@ function showPTab(name,btn){
 function saveProfileSettings(){
   if(!currentUser)return;
   currentUser.firstName=document.getElementById('editFirst').value.trim()||currentUser.firstName;
-  currentUser.lastName=document.getElementById('editLast').value.trim()||currentUser.lastName;
-  currentUser.email=document.getElementById('editEmail').value.trim()||currentUser.email;
-  currentUser.phone=document.getElementById('editPhone').value.trim();
-  currentUser.address=document.getElementById('editAddress').value.trim();
-  currentUser.city=document.getElementById('editCity').value.trim();
-  currentUser.country=document.getElementById('editCountry').value.trim();
-  saveUserData();renderProfile();showToast('Profile updated ✓');
+  currentUser.lastName =document.getElementById('editLast').value.trim() ||currentUser.lastName;
+  currentUser.email    =document.getElementById('editEmail').value.trim()   ||currentUser.email;
+  currentUser.phone    =document.getElementById('editPhone').value.trim();
+  currentUser.address  =document.getElementById('editAddress').value.trim();
+  currentUser.city     =document.getElementById('editCity').value.trim();
+  currentUser.country  =document.getElementById('editCountry').value.trim();
+  saveUserData(); renderProfile(); showToast('Profile updated ✓');
 }
 
 function changePassword(){
   if(!currentUser)return;
-  const c=document.getElementById('curPw').value,n=document.getElementById('newPw').value,f=document.getElementById('cfPw').value;
-  if(c!==currentUser.password){showToast('Current password incorrect');return;}
-  if(n.length<8){showToast('New password must be at least 8 characters');return;}
-  if(n!==f){showToast('Passwords do not match');return;}
-  currentUser.password=n;saveUserData();
+  const c=document.getElementById('curPw').value, n=document.getElementById('newPw').value, f=document.getElementById('cfPw').value;
+  if(c!==currentUser.password){ showToast('Current password incorrect'); return; }
+  if(n.length<8){ showToast('New password must be at least 8 characters'); return; }
+  if(n!==f){ showToast('Passwords do not match'); return; }
+  currentUser.password=n; saveUserData();
   ['curPw','newPw','cfPw'].forEach(id=>document.getElementById(id).value='');
   showToast('Password updated ✓');
 }
@@ -1828,34 +1947,35 @@ function changePassword(){
 function deleteAccount(){
   if(!currentUser)return;
   if(!confirm('Delete your account? This cannot be undone.'))return;
-  DB.set('users',getUsers().filter(u=>u.email!==currentUser.email));
-  currentUser=null;cart=[];wishlist=[];updateMenuFooter();updateCartBadge();showView('shop');showToast('Account deleted');
+  LS.set('users', getUsers().filter(u=>u.email!==currentUser.email));
+  currentUser=null; cart=[]; wishlist=[];
+  updateMenuFooter(); updateCartBadge(); showView('shop'); showToast('Account deleted');
 }
 
-/* ════════════════════════════════════════
-   ADMIN
-════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════
+   ADMIN — render
+════════════════════════════════════════════════════════ */
 function renderAdminPanel(){
-  updateAdminDashboard();renderProductsTable();renderCatsAdmin();renderAdminCatBar();renderUsersTable();loadSettings();
+  updateAdminDashboard(); renderProductsTable(); renderCatsAdmin(); renderAdminCatBar(); renderUsersTable(); loadSettings();
   document.getElementById('setAdminUser').value=getAdminCreds().user;
   document.getElementById('navProdCount').textContent=getProducts().length;
   document.getElementById('navUserCount').textContent=getUsers().length;
 }
 
 function updateAdminDashboard(){
-  const p=getProducts(),u=getUsers(),c=getCategories(),cur=getSettings().currency||'€';
+  const p=getProducts(), u=getUsers(), c=getCategories(), cur=getSettings().currency||'€';
   document.getElementById('d-products').textContent=p.length;
   document.getElementById('d-users').textContent=u.length;
   document.getElementById('d-cats').textContent=c.length;
   document.getElementById('d-visible').textContent=p.filter(x=>x.visible).length;
   document.getElementById('navProdCount').textContent=p.length;
   document.getElementById('navUserCount').textContent=u.length;
-  const recent=[...p].reverse().slice(0,5);
+  const recent=[...p].slice(0,5);
   document.getElementById('recentProducts').innerHTML=recent.length
     ? recent.map(x=>`<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">
-        <div style="width:38px;height:46px;background:#111;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:'Cormorant Garamond',serif;font-style:italic;font-size:14px;color:rgba(201,169,110,.25);flex-shrink:0;overflow:hidden;border-radius:var(--radius);">${x.image?`<img src="${x.image}" style="width:100%;height:100%;object-fit:cover;">`:x.name[0]}</div>
-        <div style="flex:1;"><div style="font-family:'Cormorant Garamond',serif;font-size:14px;">${x.name}</div><div style="font-size:8px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);margin-top:2px;">${x.category}</div></div>
-        <div style="font-size:13px;">${cur} ${Number(x.price).toLocaleString()}</div>
+        <div style="width:38px;height:46px;background:#111;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:'Cormorant Garamond',serif;font-style:italic;font-size:14px;color:rgba(201,169,110,.25);flex-shrink:0;overflow:hidden;border-radius:2px;">${x.image?`<img src="${x.image}" style="width:100%;height:100%;object-fit:cover;">`:x.name[0]}</div>
+        <div style="flex:1;min-width:0;"><div style="font-family:'Cormorant Garamond',serif;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${x.name}</div><div style="font-size:8px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);margin-top:2px;">${x.category}</div></div>
+        <div style="font-size:13px;flex-shrink:0;">${cur} ${Number(x.price).toLocaleString()}</div>
         <div style="width:8px;height:8px;border-radius:50%;background:${x.visible?'var(--green)':'var(--red)'};flex-shrink:0;"></div>
       </div>`).join('')
     : '<div style="text-align:center;padding:24px;color:rgba(244,241,237,.2);font-style:italic;">No products yet.</div>';
@@ -1866,7 +1986,7 @@ function renderUsersTable(){
   const list=document.getElementById('userCardsList');
   const empty=document.getElementById('usersEmpty');
   if(!list)return;
-  if(!users.length){list.innerHTML='';empty.style.display='block';return;}
+  if(!users.length){ list.innerHTML=''; empty.style.display='block'; return; }
   empty.style.display='none';
   list.innerHTML=users.map(u=>{
     const init=(u.firstName[0]+(u.lastName?.[0]||'')).toUpperCase();
@@ -1892,15 +2012,15 @@ function renderUsersTable(){
 }
 
 function renderAdminCatBar(){
-  const bar=document.getElementById('adminCatBar'),cats=getCategories();
+  const bar=document.getElementById('adminCatBar'), cats=getCategories();
   bar.innerHTML=`<button class="cf ${adminCatFilter==='all'?'active':''}" onclick="adminFilterCat('all',this)">All</button>`;
-  cats.forEach(c=>{bar.innerHTML+=`<button class="cf ${adminCatFilter===c?'active':''}" onclick="adminFilterCat('${c}',this)">${c}</button>`;});
+  cats.forEach(c=>{ bar.innerHTML+=`<button class="cf ${adminCatFilter===c?'active':''}" onclick="adminFilterCat('${c}',this)">${c}</button>`; });
 }
 
 function adminFilterCat(cat,btn){
   adminCatFilter=cat;
   document.querySelectorAll('.cf').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');renderProductsTable();
+  btn.classList.add('active'); renderProductsTable();
 }
 
 function renderProductsTable(){
@@ -1916,7 +2036,7 @@ function renderProductsTable(){
   const list=document.getElementById('productCardsList');
   const empty=document.getElementById('tableEmpty');
   if(!list)return;
-  if(!products.length){list.innerHTML='';empty.style.display='block';return;}
+  if(!products.length){ list.innerHTML=''; empty.style.display='block'; return; }
   empty.style.display='none';
   list.innerHTML=products.map(p=>{
     const thumb=p.image
@@ -1930,20 +2050,15 @@ function renderProductsTable(){
         <div class="apc-info">
           <div class="apc-name">${p.name}</div>
           <div class="apc-brand">${p.brand||'Maison Noir'}</div>
-          <div class="apc-meta">
-            <span class="apc-cat">${p.category}</span>
-            ${tagHtml}
-          </div>
+          <div class="apc-meta"><span class="apc-cat">${p.category}</span>${tagHtml}</div>
           <div style="margin-top:6px;display:flex;align-items:center;gap:8px;">
-            <span class="apc-price">${cur} ${Number(p.price).toLocaleString()}</span>
-            ${oldHtml}
+            <span class="apc-price">${cur} ${Number(p.price).toLocaleString()}</span>${oldHtml}
           </div>
         </div>
       </div>
       <div class="apc-actions">
         <button class="apc-btn vis${p.visible?' on':''}" onclick="toggleVis('${p.id}')">
-          <span class="apc-btn-ico">${p.visible?'👁':'🚫'}</span>
-          ${p.visible?'Visible':'Hidden'}
+          <span class="apc-btn-ico">${p.visible?'👁':'🚫'}</span>${p.visible?'Visible':'Hidden'}
         </button>
         <button class="apc-btn edit" onclick="openProductModal('${p.id}')">
           <span class="apc-btn-ico">✏️</span>Edit
@@ -1956,59 +2071,67 @@ function renderProductsTable(){
   }).join('');
 }
 
+/* ── Toggle visible on Firebase ── */
 function toggleVis(id){
-  const products=getProducts(),p=products.find(x=>x.id===id);
-  if(p){p.visible=!p.visible;DB.set('products',products);DB.broadcast('products');renderProductsTable();updateAdminDashboard();showToast(p.visible?`"${p.name}" now visible`:`"${p.name}" hidden`);}
+  const p=getProducts().find(x=>x.id===id); if(!p)return;
+  fbUpdate('products/'+id, { visible: !p.visible })
+    .then(()=> showToast((!p.visible)?`"${p.name}" now visible`:`"${p.name}" hidden`))
+    .catch(e=> showToast('Error: '+e.message));
 }
 
 function renderCatsAdmin(){
-  const cats=getCategories(),products=getProducts();
+  const cats=getCategories(), products=getProducts();
   document.getElementById('catsGrid').innerHTML=cats.map(c=>{
     const count=products.filter(p=>p.category===c).length;
     return `<div class="cat-card"><button class="cat-del-btn" onclick="deleteCategory('${c}')">✕</button><div class="cat-card-name">${c}</div><div class="cat-card-count">${count} product${count!==1?'s':''}</div></div>`;
   }).join('');
 }
 
+/* ── Add / delete categories on Firebase ── */
 function addCategory(){
-  const inp=document.getElementById('newCatName'),name=inp.value.trim();
-  if(!name)return;const cats=getCategories();
-  if(cats.includes(name)){showToast('Category already exists');return;}
-  cats.push(name);DB.set('categories',cats);DB.broadcast('categories');inp.value='';
-  renderCatsAdmin();renderAdminCatBar();renderShop();showToast(`"${name}" category added`);
+  const inp=document.getElementById('newCatName'), name=inp.value.trim();
+  if(!name)return;
+  const cats=getCategories();
+  if(cats.includes(name)){ showToast('Category already exists'); return; }
+  cats.push(name);
+  fbSet('categories', cats)
+    .then(()=>{ inp.value=''; showToast(`"${name}" category added`); })
+    .catch(e=> showToast('Error: '+e.message));
 }
 
 function deleteCategory(cat){
-  DB.set('categories',getCategories().filter(c=>c!==cat));
-  renderCatsAdmin();renderAdminCatBar();renderShop();showToast(`"${cat}" removed`);
+  fbSet('categories', getCategories().filter(c=>c!==cat))
+    .then(()=> showToast(`"${cat}" removed`))
+    .catch(e=> showToast('Error: '+e.message));
 }
 
-const adminTitles={dashboard:'Dashboard <span>Overview</span>',products:'Products <span>Catalogue</span>',categories:'Categories <span>Manager</span>',users:'Registered <span>Users</span>',settings:'Store <span>Settings</span>'};
+const adminTitles={ dashboard:'Dashboard <span>Overview</span>', products:'Products <span>Catalogue</span>', categories:'Categories <span>Manager</span>', users:'Registered <span>Users</span>', settings:'Store <span>Settings</span>' };
 function showAdminSec(name,el){
   document.querySelectorAll('.admin-sec').forEach(s=>s.classList.remove('active'));
   document.getElementById('sec-'+name).classList.add('active');
   document.querySelectorAll('.admin-nav-item').forEach(i=>i.classList.remove('active'));
   el.classList.add('active');
   document.getElementById('adminPageTitle').innerHTML=adminTitles[name]||name;
-  if(name==='products')renderProductsTable();
-  if(name==='categories')renderCatsAdmin();
-  if(name==='settings'){loadSettings();document.getElementById('setAdminUser').value=getAdminCreds().user;}
-  if(name==='users')renderUsersTable();
+  if(name==='products')  renderProductsTable();
+  if(name==='categories'){ renderCatsAdmin(); }
+  if(name==='settings'){ loadSettings(); document.getElementById('setAdminUser').value=getAdminCreds().user; }
+  if(name==='users')    renderUsersTable();
   closeAdminSb();
 }
 
-function openAdminSb(){document.getElementById('adminSb').classList.add('open');document.getElementById('adminSbOv').classList.add('open');}
-function closeAdminSb(){document.getElementById('adminSb').classList.remove('open');document.getElementById('adminSbOv').classList.remove('open');}
+function openAdminSb(){  document.getElementById('adminSb').classList.add('open');    document.getElementById('adminSbOv').classList.add('open'); }
+function closeAdminSb(){ document.getElementById('adminSb').classList.remove('open'); document.getElementById('adminSbOv').classList.remove('open'); }
 
-/* ════════════════════════════════════════
+/* ════════════════════════════════════════════════════════
    PRODUCT MODAL
-════════════════════════════════════════ */
+════════════════════════════════════════════════════════ */
 let colorCount=0;
 function openProductModal(id){
-  const modal=document.getElementById('productModal'),catSel=document.getElementById('pCategory');
+  const modal=document.getElementById('productModal'), catSel=document.getElementById('pCategory');
   catSel.innerHTML=getCategories().map(c=>`<option value="${c}">${c}</option>`).join('');
   colorCount=0;
   if(id){
-    const p=getProducts().find(x=>x.id===id);if(!p)return;
+    const p=getProducts().find(x=>x.id===id); if(!p)return;
     document.getElementById('modalTitle').textContent='Edit Product';
     document.getElementById('editProductId').value=id;
     document.getElementById('pName').value=p.name;
@@ -2020,73 +2143,84 @@ function openProductModal(id){
     document.getElementById('pDesc').value=p.desc||'';
     document.getElementById('pImageData').value=p.image||'';
     const prev=document.getElementById('imagePreview');
-    if(p.image){prev.src=p.image;prev.style.display='block';}else prev.style.display='none';
-    document.getElementById('pVisibleToggle').classList.toggle('on',p.visible!==false);
+    if(p.image){ prev.src=p.image; prev.style.display='block'; } else prev.style.display='none';
+    document.getElementById('pVisibleToggle').classList.toggle('on', p.visible!==false);
     document.getElementById('colorInputs').innerHTML='';
     (p.colors||[]).forEach(c=>addColorInput(c));
-  }else{
+  } else {
     document.getElementById('modalTitle').textContent='Add New Product';
     document.getElementById('editProductId').value='';
     ['pName','pBrand','pOldPrice','pDesc'].forEach(id=>document.getElementById(id).value='');
-    document.getElementById('pTag').value='';document.getElementById('pPrice').value='';
-    document.getElementById('pImageData').value='';document.getElementById('imagePreview').style.display='none';
+    document.getElementById('pTag').value=''; document.getElementById('pPrice').value='';
+    document.getElementById('pImageData').value=''; document.getElementById('imagePreview').style.display='none';
     document.getElementById('pVisibleToggle').classList.add('on');
-    document.getElementById('colorInputs').innerHTML='';addColorInput('#1a1a1a');
+    document.getElementById('colorInputs').innerHTML=''; addColorInput('#1a1a1a');
   }
-  modal.classList.add('open');document.body.style.overflow='hidden';
+  modal.classList.add('open'); document.body.style.overflow='hidden';
 }
-function closeProductModal(){document.getElementById('productModal').classList.remove('open');document.body.style.overflow='';}
+function closeProductModal(){ document.getElementById('productModal').classList.remove('open'); document.body.style.overflow=''; }
 
 function handleImgUpload(e){
-  const file=e.target.files[0];if(!file)return;
-  if(file.size>5*1024*1024){showToast('Image too large — max 5MB');return;}
+  const file=e.target.files[0]; if(!file)return;
+  if(file.size>5*1024*1024){ showToast('Image too large — max 5MB'); return; }
   const reader=new FileReader();
-  reader.onload=ev=>{document.getElementById('pImageData').value=ev.target.result;const prev=document.getElementById('imagePreview');prev.src=ev.target.result;prev.style.display='block';};
+  reader.onload=ev=>{ document.getElementById('pImageData').value=ev.target.result; const prev=document.getElementById('imagePreview'); prev.src=ev.target.result; prev.style.display='block'; };
   reader.readAsDataURL(file);
 }
 
 function addColorInput(val){
-  colorCount++;const id='col_'+colorCount;
-  const div=document.createElement('div');div.className='color-input-wrap';div.id=id;
+  colorCount++; const id='col_'+colorCount;
+  const div=document.createElement('div'); div.className='color-input-wrap'; div.id=id;
   div.innerHTML=`<input type="color" value="${val||'#000000'}" oninput="document.querySelector('#${id} input[type=text]').value=this.value"><input type="text" value="${val||'#000000'}" maxlength="7" oninput="if(/^#[0-9a-fA-F]{6}$/.test(this.value))document.querySelector('#${id} input[type=color]').value=this.value"><span style="cursor:pointer;color:rgba(244,241,237,.28);margin-left:4px;" onclick="document.getElementById('${id}').remove()">✕</span>`;
   document.getElementById('colorInputs').appendChild(div);
 }
+function getColors(){ return [...document.querySelectorAll('#colorInputs .color-input-wrap')].map(w=>w.querySelector('input[type="text"]').value).filter(Boolean); }
 
-function getColors(){return [...document.querySelectorAll('#colorInputs .color-input-wrap')].map(w=>w.querySelector('input[type="text"]').value).filter(Boolean);}
-
+/* ── Save product → Firebase ── */
 function saveProduct(){
-  const name=document.getElementById('pName').value.trim(),price=document.getElementById('pPrice').value,cat=document.getElementById('pCategory').value;
-  if(!name||!price||!cat){showToast('Name, price and category are required');return;}
-  const products=getProducts(),editId=document.getElementById('editProductId').value;
+  const name=document.getElementById('pName').value.trim();
+  const price=document.getElementById('pPrice').value;
+  const cat=document.getElementById('pCategory').value;
+  if(!name||!price||!cat){ showToast('Name, price and category are required'); return; }
+  const editId=document.getElementById('editProductId').value;
+  const id=editId||'p'+Date.now();
+  const existing=editId ? getProducts().find(p=>p.id===editId) : null;
   const product={
-    id:editId||'p'+Date.now(),name,
-    brand:document.getElementById('pBrand').value.trim()||'Maison Noir',
-    category:cat,tag:document.getElementById('pTag').value,
-    price:parseFloat(price),oldPrice:parseFloat(document.getElementById('pOldPrice').value)||null,
-    desc:document.getElementById('pDesc').value.trim(),
-    image:document.getElementById('pImageData').value,
-    colors:getColors(),
-    visible:document.getElementById('pVisibleToggle').classList.contains('on'),
-    addedAt:editId?(products.find(p=>p.id===editId)?.addedAt||Date.now()):Date.now()
+    id, name,
+    brand:    document.getElementById('pBrand').value.trim()||'Maison Noir',
+    category: cat,
+    tag:      document.getElementById('pTag').value,
+    price:    parseFloat(price),
+    oldPrice: parseFloat(document.getElementById('pOldPrice').value)||null,
+    desc:     document.getElementById('pDesc').value.trim(),
+    image:    document.getElementById('pImageData').value,
+    colors:   getColors(),
+    visible:  document.getElementById('pVisibleToggle').classList.contains('on'),
+    addedAt:  existing ? (existing.addedAt||Date.now()) : Date.now()
   };
-  if(editId){const idx=products.findIndex(p=>p.id===editId);if(idx>-1)products[idx]=product;showToast(`"${name}" updated`);}
-  else{products.push(product);showToast(`"${name}" added — visible to customers!`);}
-  DB.set('products',products);
-  DB.broadcast('products');
-  closeProductModal();renderProductsTable();updateAdminDashboard();renderShop();
-  document.getElementById('navProdCount').textContent=products.length;
+
+  /* Write to Firebase — all clients update instantly via listener */
+  fbSet('products/'+id, product)
+    .then(()=>{
+      showToast(editId ? `"${name}" updated ✓` : `"${name}" added — live now! 🎉`);
+      closeProductModal();
+    })
+    .catch(e=> showToast('Save failed: '+e.message));
 }
 
+/* ── Delete product from Firebase ── */
 let pendingDeleteId=null;
-function confirmDelete(id){pendingDeleteId=id;document.getElementById('confirmOverlay').classList.add('open');}
-function closeConfirm(){pendingDeleteId=null;document.getElementById('confirmOverlay').classList.remove('open');}
+function confirmDelete(id){ pendingDeleteId=id; document.getElementById('confirmOverlay').classList.add('open'); }
+function closeConfirm(){     pendingDeleteId=null; document.getElementById('confirmOverlay').classList.remove('open'); }
 document.getElementById('confirmDelBtn').addEventListener('click',()=>{
   if(!pendingDeleteId)return;
-  DB.set('products',getProducts().filter(p=>p.id!==pendingDeleteId));
-  DB.broadcast('products');
-  closeConfirm();renderProductsTable();updateAdminDashboard();showToast('Product deleted');
+  const id=pendingDeleteId;
+  fbRemove('products/'+id)
+    .then(()=>{ closeConfirm(); showToast('Product deleted'); })
+    .catch(e=>{ closeConfirm(); showToast('Error: '+e.message); });
 });
 
+/* ── Settings → Firebase ── */
 function loadSettings(){
   const s=getSettings();
   document.getElementById('setStoreName').value=s.storeName||'';
@@ -2094,49 +2228,71 @@ function loadSettings(){
   document.getElementById('setCurrency').value=s.currency||'€';
 }
 function saveSettings(){
-  DB.set('settings',{storeName:document.getElementById('setStoreName').value.trim(),tagline:document.getElementById('setTagline').value.trim(),currency:document.getElementById('setCurrency').value.trim()||'€'});
-  showToast('Settings saved ✓');
+  const s={ storeName:document.getElementById('setStoreName').value.trim(), tagline:document.getElementById('setTagline').value.trim(), currency:document.getElementById('setCurrency').value.trim()||'€' };
+  fbSet('settings', s)
+    .then(()=> showToast('Settings saved ✓'))
+    .catch(e=> showToast('Error: '+e.message));
 }
+
+/* ── Admin account → localStorage (stays private) ── */
 function saveAdminAccount(){
-  const c=getAdminCreds(),cur=document.getElementById('setCurrentPw').value;
-  const nw=document.getElementById('setNewPw').value,cf=document.getElementById('setConfirmPw').value;
+  const c=getAdminCreds(), cur=document.getElementById('setCurrentPw').value;
+  const nw=document.getElementById('setNewPw').value, cf=document.getElementById('setConfirmPw').value;
   const nu=document.getElementById('setAdminUser').value.trim();
-  if(!nu){showToast('Username cannot be empty');return;}
-  if(nw||cur){if(cur!==c.pass){showToast('Current password incorrect');return;}if(nw!==cf){showToast('Passwords do not match');return;}if(nw.length<6){showToast('Min 6 characters');return;}DB.set('adminCreds',{user:nu,pass:nw});}
-  else DB.set('adminCreds',{user:nu,pass:c.pass});
+  if(!nu){ showToast('Username cannot be empty'); return; }
+  if(nw||cur){
+    if(cur!==c.pass){ showToast('Current password incorrect'); return; }
+    if(nw!==cf){ showToast('Passwords do not match'); return; }
+    if(nw.length<6){ showToast('Min 6 characters'); return; }
+    LS.set('adminCreds',{user:nu,pass:nw});
+  } else {
+    LS.set('adminCreds',{user:nu,pass:c.pass});
+  }
   document.getElementById('adminUserName').textContent=nu;
   ['setCurrentPw','setNewPw','setConfirmPw'].forEach(id=>document.getElementById(id).value='');
   showToast('Admin account updated ✓');
 }
 
-/* ════════════════════════════════════════
-   SCROLL REVEAL
-════════════════════════════════════════ */
-const io=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}});},{threshold:.08});
-function attachReveals(){document.querySelectorAll('.reveal').forEach(r=>io.observe(r));}
+/* ════════════════════════════════════════════════════════
+   ADMIN ACCESS — URL only: yourwebsite.com#admin
+════════════════════════════════════════════════════════ */
+function checkAdminHash(){
+  if(window.location.hash==='#admin'){
+    history.replaceState(null,'',window.location.pathname);
+    showView('adminLogin');
+  }
+}
+window.addEventListener('hashchange', checkAdminHash);
 
-/* ════════════════════════════════════════
+/* ════════════════════════════════════════════════════════
+   SCROLL REVEAL
+════════════════════════════════════════════════════════ */
+const io=new IntersectionObserver(entries=>{ entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } }); },{threshold:.08});
+function attachReveals(){ document.querySelectorAll('.reveal').forEach(r=>io.observe(r)); }
+
+/* ════════════════════════════════════════════════════════
    TOAST
-════════════════════════════════════════ */
+════════════════════════════════════════════════════════ */
 let toastT;
 function showToast(msg){
   document.getElementById('toastMsg').textContent=msg;
-  const t=document.getElementById('toast');t.classList.add('show');
-  clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),3200);
+  const t=document.getElementById('toast'); t.classList.add('show');
+  clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),3400);
 }
 
-/* ════════════════════════════════════════
+/* ════════════════════════════════════════════════════════
    NEWSLETTER
-════════════════════════════════════════ */
-function handleSubscribe(e){e.preventDefault();e.target.querySelector('input').value='';showToast("You're now in the Maison Noir circle! 🎉");}
+════════════════════════════════════════════════════════ */
+function handleSubscribe(e){ e.preventDefault(); e.target.querySelector('input').value=''; showToast("You're now in the Maison Noir circle! 🎉"); }
 
-/* ════════════════════════════════════════
+/* ════════════════════════════════════════════════════════
    INIT
-════════════════════════════════════════ */
-initData();
-showView('shop');
-checkAdminHash(); /* must run AFTER showView('shop') so #admin wins */
-setTimeout(attachReveals,150);
+════════════════════════════════════════════════════════ */
+initData().then(()=>{
+  showView('shop');
+  checkAdminHash();
+  setTimeout(attachReveals, 200);
+});
 </script>
 </body>
 </html>
