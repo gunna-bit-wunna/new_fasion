@@ -1542,7 +1542,6 @@ function checkAdminHash(){
     showView('adminLogin');
   }
 }
-checkAdminHash();
 window.addEventListener('hashchange', checkAdminHash);
 
 function doAdminLogin(){
@@ -2136,6 +2135,7 @@ function handleSubscribe(e){e.preventDefault();e.target.querySelector('input').v
 ════════════════════════════════════════ */
 initData();
 showView('shop');
+checkAdminHash(); /* must run AFTER showView('shop') so #admin wins */
 setTimeout(attachReveals,150);
 </script>
 </body>
