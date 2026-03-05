@@ -1397,7 +1397,8 @@ function initFirebase() {
 let _cache = {
   products:   [],
   categories: ['Women','Men','Accessories','Jewellery'],
-  settings:   { storeName:'MAISON NOIR', tagline:'Luxury Fashion House', currency:'€' }
+  settings:   { storeName:'MAISON NOIR', tagline:'Luxury Fashion House', currency:'€' },
+  users:      []
 };
 
 /* ─────────────────────────────────────────────────────
@@ -1417,7 +1418,7 @@ const getProducts     = () => _cache.products;
 const getCategories   = () => _cache.categories;
 const getSettings     = () => _cache.settings;
 const getAdminCreds   = () => LS.get('adminCreds')   || { user:'admin', pass:'admin123' };
-const getUsers        = () => LS.get('users')         || [];
+const getUsers        = () => _cache.users;
 const getSeenProducts = () => LS.get('seenProducts')  || [];
 
 /* ─────────────────────────────────────────────────────
@@ -1460,6 +1461,17 @@ function attachListeners() {
   _db.ref('settings').on('value', snap => {
     if (snap.val()) _cache.settings = snap.val();
   });
+
+  /* ── Users listener — keeps user count live across all devices ── */
+  _db.ref('users').on('value', snap => {
+    const raw = snap.val();
+    _cache.users = raw ? Object.values(raw) : [];
+    /* Update admin counts if admin panel is open */
+    if (document.getElementById('adminView')?.classList.contains('active')) {
+      updateAdminDashboard();
+      renderUsersTable();
+    }
+  });
 }
 
 /* Re-render whichever view is showing right now */
@@ -1487,12 +1499,11 @@ const DEFAULT_PRODUCTS = {
 async function initData() {
   /* Always init local-only stores */
   if (!LS.get('adminCreds'))   LS.set('adminCreds',   { user:'admin', pass:'admin123' });
-  if (!LS.get('users'))        LS.set('users',        []);
   if (!LS.get('seenProducts')) LS.set('seenProducts', []);
   /* Restore login session from previous visit */
   const savedEmail = LS.get('session');
   if (savedEmail) {
-    const savedUser = (LS.get('users')||[]).find(u=>u.email===savedEmail);
+    const savedUser = _cache.users.find(u=>u.email===savedEmail);
     if (savedUser) {
       currentUser = savedUser;
       cart        = savedUser.cart    || [];
@@ -1640,7 +1651,9 @@ function doRegister(){
              address:'',city:'',country:'',
              joinDate:new Date().toLocaleDateString('en-GB',{year:'numeric',month:'long'}),
              cart:[],wishlist:[],orders:[] };
-  users.push(nu); LS.set('users',users);
+  /* Save new user to Firebase so ALL devices see them */
+  fbSet('users/' + nu.email.replace(/[.#$\[\]]/g,'_'), nu)
+    .catch(e=>console.warn('User save error:', e));
   currentUser=nu; cart=[]; wishlist=[];
   LS.set('session', nu.email); /* persist session */
   showView('shop'); showToast(`Welcome to Maison Noir, ${first}!`); updateMenuFooter();
@@ -1657,7 +1670,13 @@ function saveUserData(){
   if(!currentUser) return;
   const users=getUsers();
   const idx=users.findIndex(u=>u.email===currentUser.email);
-  if(idx>-1){ users[idx]={...users[idx],...currentUser,cart,wishlist}; LS.set('users',users); currentUser=users[idx]; }
+  if(idx>-1){
+    const updated={...users[idx],...currentUser,cart,wishlist};
+    _cache.users[idx]=updated; currentUser=updated;
+    /* Sync to Firebase */
+    fbSet('users/' + currentUser.email.replace(/[.#$\[\]]/g,'_'), updated)
+      .catch(e=>console.warn('saveUserData error:', e));
+  }
 }
 
 function handleAuthNav(){ currentUser ? showView('profile') : showView('login'); }
@@ -1677,6 +1696,7 @@ function doAdminLogin(){
   const p=document.getElementById('adminLoginPass').value;
   const c=getAdminCreds();
   if(u===c.user && p===c.pass){
+    LS.set('adminSession', u); /* persist admin session */
     document.getElementById('adminUserName').textContent=u;
     document.getElementById('adminLoginError').classList.remove('show');
     showView('admin');
@@ -1685,7 +1705,7 @@ function doAdminLogin(){
   }
 }
 document.getElementById('adminLoginPass').addEventListener('keydown',e=>{ if(e.key==='Enter') doAdminLogin(); });
-function doAdminLogout(){ showView('shop'); }
+function doAdminLogout(){ LS.set('adminSession', null); showView('shop'); }
 
 /* ════════════════════════════════════════════════════════
    CART
@@ -1972,7 +1992,7 @@ function changePassword(){
 function deleteAccount(){
   if(!currentUser)return;
   if(!confirm('Delete your account? This cannot be undone.'))return;
-  LS.set('users', getUsers().filter(u=>u.email!==currentUser.email));
+  fbRemove('users/' + currentUser.email.replace(/[.#$\[\]]/g,'_'));
   currentUser=null; cart=[]; wishlist=[];
   updateMenuFooter(); updateCartBadge(); showView('shop'); showToast('Account deleted');
 }
@@ -2324,11 +2344,18 @@ function handleSubscribe(e){ e.preventDefault(); e.target.querySelector('input')
    INIT
 ════════════════════════════════════════════════════════ */
 initData().then(()=>{
-  updateMenuFooter();   /* show user name in menu if session was restored */
+  updateMenuFooter();
   updateCartBadge();
   updateWishBadge();
-  showView('shop');
-  checkAdminHash();
+  /* Restore admin session — go straight to admin panel if was logged in */
+  const adminSess = LS.get('adminSession');
+  if (adminSess) {
+    document.getElementById('adminUserName').textContent = adminSess;
+    showView('admin');
+  } else {
+    showView('shop');
+    checkAdminHash();
+  }
   setTimeout(attachReveals, 200);
 });
 </script>
