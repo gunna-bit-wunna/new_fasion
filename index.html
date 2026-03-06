@@ -220,20 +220,23 @@ input,select,textarea{font-family:'Montserrat',sans-serif;font-size:16px;/* prev
 /* ── Order confirmation notification banner ── */
 .confirm-banner{
   position:fixed;top:0;left:0;right:0;z-index:999;
-  background:linear-gradient(135deg,#1a2e1a,#0f1f0f);
-  border-bottom:2px solid var(--green);
+  background:rgba(15,22,15,.97);
+  border-bottom:3px solid var(--green);
+  border-left:4px solid var(--green);
   padding:0 16px;
   transform:translateY(-100%);transition:transform .45s cubic-bezier(.34,1.1,.64,1);
   display:flex;align-items:center;gap:14px;
   padding-top:max(14px,env(safe-area-inset-top));
   padding-bottom:14px;
+  backdrop-filter:blur(12px);
+  box-shadow:0 4px 24px rgba(0,0,0,.5);
 }
 .confirm-banner.show{transform:translateY(0);}
-.confirm-banner-ico{font-size:26px;flex-shrink:0;}
+.confirm-banner-ico{font-size:28px;flex-shrink:0;}
 .confirm-banner-body{flex:1;min-width:0;}
-.confirm-banner-title{font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--green);margin-bottom:2px;}
-.confirm-banner-msg{font-size:11px;color:rgba(244,241,237,.65);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.confirm-banner-close{background:none;border:none;color:rgba(244,241,237,.4);font-size:18px;padding:6px;flex-shrink:0;}
+.confirm-banner-title{font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--green);margin-bottom:3px;transition:color .3s;}
+.confirm-banner-msg{font-size:12px;color:rgba(244,241,237,.8);line-height:1.5;}
+.confirm-banner-close{background:none;border:none;color:rgba(244,241,237,.4);font-size:18px;padding:6px;flex-shrink:0;cursor:pointer;}
 
 /* ── Order status badge in user profile ── */
 .order-status-badge{
@@ -972,10 +975,10 @@ footer{padding-bottom:max(32px,env(safe-area-inset-bottom,16px));}
 
 <!-- Payment confirmation banner -->
 <div class="confirm-banner" id="confirmBanner">
-  <div class="confirm-banner-ico">✅</div>
+  <div class="confirm-banner-ico" id="confirmBannerIco">✅</div>
   <div class="confirm-banner-body">
-    <div class="confirm-banner-title">Payment Confirmed!</div>
-    <div class="confirm-banner-msg" id="confirmBannerMsg">Your order has been confirmed by the store.</div>
+    <div class="confirm-banner-title" id="confirmBannerTitle">Order Update</div>
+    <div class="confirm-banner-msg" id="confirmBannerMsg">Your order has been updated.</div>
   </div>
   <button class="confirm-banner-close" onclick="dismissConfirmBanner()">✕</button>
 </div>
@@ -1891,36 +1894,32 @@ function attachListeners(){
     if(document.getElementById('sec-orders')?.classList.contains('active')) renderOrdersAdmin();
     if(document.getElementById('adminView')?.classList.contains('active'))  updateAdminDashboard();
 
-    /* ── User notification: detect when admin confirms THIS user's order ── */
+    /* ── User notification: fire on ANY status change for this user's orders ── */
     if(currentUser) {
       _cache.orders.forEach(order => {
         if(order.email !== currentUser.email) return;
         const prevOrder = prev.find(p=>p.id===order.id);
-        /* Fire notification if status changed TO confirmed/paid/delivered */
-        const notifyStatuses = ['confirmed','paid','delivered'];
-        if(notifyStatuses.includes(order.status) && prevOrder && prevOrder.status !== order.status) {
+        /* Fire if status changed (any direction) */
+        if(prevOrder && prevOrder.status !== order.status) {
           const msgs = {
-            confirmed: `Order ${order.id} has been confirmed! 🎉`,
-            paid:      `Payment for order ${order.id} has been verified! ✓`,
-            delivered: `Order ${order.id} has been delivered! 📦`
+            pending:   { text:`⏳ Your order ${order.id} is pending. We are reviewing your payment.`,   icon:'⏳', color:'#e0955c' },
+            confirmed: { text:`✅ Payment confirmed! Your order ${order.id} has been verified.`,         icon:'✅', color:'var(--green)' },
+            paid:      { text:`💰 Payment received for order ${order.id}. Thank you!`,                   icon:'💰', color:'var(--green)' },
+            delivered: { text:`🚚 Great news! Your order ${order.id} is on its way to you!`,             icon:'🚚', color:'var(--blue)' }
           };
-          showConfirmBanner(msgs[order.status] || `Order ${order.id} updated to: ${order.status}`);
-          /* Save notification to localStorage so it persists if user refreshes */
-          const notifs = LS.get('userNotifs') || [];
-          notifs.unshift({ orderId:order.id, status:order.status, msg:msgs[order.status], ts:Date.now(), seen:false });
-          LS.set('userNotifs', notifs.slice(0,20)); /* keep last 20 */
+          const m = msgs[order.status];
+          if(m){
+            showConfirmBanner(m.text, m.icon, m.color);
+            const notifs = LS.get('userNotifs') || [];
+            notifs.unshift({ orderId:order.id, status:order.status, msg:m.text, ts:Date.now(), seen:false });
+            LS.set('userNotifs', notifs.slice(0,30));
+          }
         }
-        /* Sync order status into currentUser.orders for profile display */
+        /* Sync status into local user orders */
         const localOrder = (currentUser.orders||[]).find(o=>o.id===order.id);
-        if(localOrder && localOrder.status !== order.status) {
-          localOrder.status = order.status;
-        }
+        if(localOrder) localOrder.status = order.status;
       });
-      /* Re-render profile orders tab if open */
-      if(document.getElementById('profileView')?.classList.contains('active')) {
-        renderProfileOrders();
-      }
-      /* Update notification bell */
+      if(document.getElementById('profileView')?.classList.contains('active')) renderProfileOrders();
       updateNotifBell();
     }
   });
@@ -1942,13 +1941,6 @@ async function initData(){
   if(!LS.get('adminCreds'))   LS.set('adminCreds',   { user:'admin', pass:'admin123' });
   if(!LS.get('seenProducts')) LS.set('seenProducts', []);
 
-  /* Restore user session */
-  const savedEmail = LS.get('session');
-  if(savedEmail){
-    const u = (_cache.users||[]).find(u=>u.email===savedEmail);
-    if(u){ currentUser=u; cart=u.cart||[]; wishlist=u.wishlist||[]; }
-  }
-
   initFirebase();
   if(!_firebaseReady){
     _cache.products   = Object.values(DEFAULT_PRODUCTS);
@@ -1956,13 +1948,33 @@ async function initData(){
     return;
   }
 
+  /* Seed default data if first launch */
   const snap = await _db.ref('products').once('value');
   if(!snap.exists()){
     await _db.ref('products').set(DEFAULT_PRODUCTS);
     await _db.ref('categories').set(['Women','Men','Accessories','Jewellery']);
     await _db.ref('settings').set(_cache.settings);
   }
+
   attachListeners();
+
+  /* Restore user session — fetch user directly from Firebase AFTER connecting */
+  const savedEmail = LS.get('session');
+  if(savedEmail){
+    const key = savedEmail.replace(/[.#$[\]]/g, '_');
+    try {
+      const userSnap = await _db.ref('users/'+key).once('value');
+      if(userSnap.exists()){
+        const u = userSnap.val();
+        currentUser = u;
+        cart        = u.cart     || [];
+        wishlist    = u.wishlist || [];
+      } else {
+        /* User deleted or not found — clear stale session */
+        LS.set('session', null);
+      }
+    } catch(e){ console.warn('Session restore error:', e); }
+  }
 }
 
 /* ════════════════════════════════════════════════════════
@@ -2924,9 +2936,16 @@ window.addEventListener('hashchange',checkAdminHash);
 ════════════════════════════════════════════════════════ */
 let _confirmBannerTimer = null;
 
-function showConfirmBanner(msg){
-  const banner = document.getElementById('confirmBanner');
-  const msgEl  = document.getElementById('confirmBannerMsg');
+function showConfirmBanner(msg, icon, color){
+  const banner    = document.getElementById('confirmBanner');
+  const msgEl     = document.getElementById('confirmBannerMsg');
+  const icoEl     = document.getElementById('confirmBannerIco');
+  const titleEl   = document.getElementById('confirmBannerTitle');
+  const titles    = { '⏳':'Order Pending', '✅':'Payment Confirmed!', '💰':'Payment Received!', '🚚':'Order On Its Way!' };
+  const titleColors= { '⏳':'#e0955c', '✅':'var(--green)', '💰':'var(--green)', '🚚':'var(--blue)' };
+  if(icoEl  && icon)  icoEl.textContent = icon;
+  if(titleEl && icon){ titleEl.textContent = titles[icon]||'Order Update'; titleEl.style.color = titleColors[icon]||'var(--green)'; }
+  if(banner  && color){ banner.style.borderBottomColor = color; banner.style.borderLeftColor = color; }
   if(!banner||!msgEl) return;
   msgEl.textContent = msg;
   banner.classList.add('show');
@@ -2994,7 +3013,10 @@ function checkPendingNotifs(){
   const unseen = notifs.filter(n=>!n.seen);
   if(unseen.length>0){
     /* Show the most recent one */
-    showConfirmBanner(unseen[0].msg);
+    const icons={pending:'⏳',confirmed:'✅',paid:'💰',delivered:'🚚'};
+    const colors={pending:'#e0955c',confirmed:'var(--green)',paid:'var(--green)',delivered:'var(--blue)'};
+    const n0=unseen[0];
+    showConfirmBanner(n0.msg, icons[n0.status]||'📬', colors[n0.status]);
     /* Mark all as seen */
     notifs.forEach(n=>n.seen=true);
     LS.set('userNotifs', notifs);
@@ -3029,11 +3051,12 @@ function handleSubscribe(e){ e.preventDefault(); e.target.querySelector('input')
    INIT
 ════════════════════════════════════════════════════════ */
 initData().then(()=>{
-  /* Restore user session UI */
+  /* Session was restored inside initData — update UI now */
   if(currentUser){
     updateMenuFooter(); updateCartBadge(); updateWishBadge();
     const nb=document.getElementById('notifBellBtn'); if(nb) nb.style.display='inline-flex';
-    setTimeout(checkPendingNotifs, 1500); /* check for order confirmations received while offline */
+    updateNotifBell();
+    setTimeout(checkPendingNotifs, 800);
   }
   /* Restore admin session */
   const adminSess=LS.get('adminSession');
