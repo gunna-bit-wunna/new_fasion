@@ -216,6 +216,48 @@ input,select,textarea{font-family:'Montserrat',sans-serif;font-size:16px;/* prev
 @keyframes checkoutShine{0%{left:-60px;}100%{left:110%;}}
 .btn-checkout:active{background:var(--gold-l);}
 
+
+/* ── Order confirmation notification banner ── */
+.confirm-banner{
+  position:fixed;top:0;left:0;right:0;z-index:999;
+  background:linear-gradient(135deg,#1a2e1a,#0f1f0f);
+  border-bottom:2px solid var(--green);
+  padding:0 16px;
+  transform:translateY(-100%);transition:transform .45s cubic-bezier(.34,1.1,.64,1);
+  display:flex;align-items:center;gap:14px;
+  padding-top:max(14px,env(safe-area-inset-top));
+  padding-bottom:14px;
+}
+.confirm-banner.show{transform:translateY(0);}
+.confirm-banner-ico{font-size:26px;flex-shrink:0;}
+.confirm-banner-body{flex:1;min-width:0;}
+.confirm-banner-title{font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--green);margin-bottom:2px;}
+.confirm-banner-msg{font-size:11px;color:rgba(244,241,237,.65);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.confirm-banner-close{background:none;border:none;color:rgba(244,241,237,.4);font-size:18px;padding:6px;flex-shrink:0;}
+
+/* ── Order status badge in user profile ── */
+.order-status-badge{
+  display:inline-block;font-size:8px;letter-spacing:.16em;text-transform:uppercase;
+  padding:3px 8px;border-radius:10px;font-weight:600;margin-left:8px;vertical-align:middle;
+}
+.order-status-badge.pending  {background:rgba(224,149,92,.15);color:#e0955c;border:1px solid rgba(224,149,92,.3);}
+.order-status-badge.confirmed{background:rgba(86,196,139,.15); color:var(--green);border:1px solid rgba(86,196,139,.3);}
+.order-status-badge.paid     {background:rgba(86,196,139,.15); color:var(--green);border:1px solid rgba(86,196,139,.3);}
+.order-status-badge.delivered{background:rgba(92,155,224,.15); color:var(--blue); border:1px solid rgba(92,155,224,.3);}
+
+/* ── User notification bell ── */
+.notif-bell-wrap{position:relative;display:inline-flex;}
+.notif-bell-dot{position:absolute;top:2px;right:2px;width:8px;height:8px;border-radius:50%;background:var(--red);display:none;animation:dotPulse 1.5s ease-in-out infinite;}
+.notif-bell-dot.show{display:block;}
+
+/* ── Confirm button in admin orders (highlighted) ── */
+.aoc-action-btn.s-confirm{
+  color:#fff;background:var(--green);font-weight:700;letter-spacing:.1em;
+  grid-column:1/-1;border-radius:0;
+}
+.aoc-action-btn.s-confirm:active{background:#3fa370;}
+.aoc-action-btn.s-confirm.done{background:rgba(86,196,139,.15);color:var(--green);font-weight:400;}
+
 /* ── Checkout Modal ── */
 .checkout-steps{display:flex;gap:0;margin-bottom:24px;border-bottom:1px solid var(--border);}
 .cstep{flex:1;text-align:center;padding:12px 6px;font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:rgba(244,241,237,.25);position:relative;transition:color .3s;}
@@ -928,6 +970,16 @@ footer{padding-bottom:max(32px,env(safe-area-inset-bottom,16px));}
 <!-- TOAST -->
 <div class="toast" id="toast"><span class="tg">✓</span><span id="toastMsg"></span></div>
 
+<!-- Payment confirmation banner -->
+<div class="confirm-banner" id="confirmBanner">
+  <div class="confirm-banner-ico">✅</div>
+  <div class="confirm-banner-body">
+    <div class="confirm-banner-title">Payment Confirmed!</div>
+    <div class="confirm-banner-msg" id="confirmBannerMsg">Your order has been confirmed by the store.</div>
+  </div>
+  <button class="confirm-banner-close" onclick="dismissConfirmBanner()">✕</button>
+</div>
+
 <!-- CONFIRM DELETE -->
 
 <!-- ══════════ CHECKOUT MODAL ══════════ -->
@@ -1021,7 +1073,7 @@ footer{padding-bottom:max(32px,env(safe-area-inset-bottom,16px));}
       <!-- STEP 3: Confirm -->
       <div class="checkout-step-body" id="co-step3">
         <div id="coConfirmSummary"></div>
-        <button class="btn-checkout" style="width:100%;margin-top:8px;" onclick="placeOrder()">Place Order ✓</button>
+        
         <button class="continue-btn" style="margin-top:8px;" onclick="coGoStep(2)">← Edit Payment</button>
       </div>
 
@@ -1107,7 +1159,7 @@ footer{padding-bottom:max(32px,env(safe-area-inset-bottom,16px));}
     <div class="drawer-footer">
       <div class="cart-total-row"><span class="cart-total-lbl">Subtotal</span><span class="cart-total-val" id="cartTotal">€0</span></div>
       <div class="cart-note">Shipping &amp; taxes calculated at checkout</div>
-      <button class="btn-checkout" onclick="openCheckout()">Proceed to Checkout →</button>
+      <button class="btn-checkout" onclick="handleCheckout()">Proceed to Checkout →</button>
       <button class="continue-btn" onclick="closeCart()">← Continue Shopping</button>
     </div>
   </div>
@@ -1153,6 +1205,9 @@ footer{padding-bottom:max(32px,env(safe-area-inset-bottom,16px));}
     </div>
     <span class="nav-logo" onclick="showView('shop')">MAISON NOIR</span>
     <div class="nav-right">
+      <button class="nav-icon-btn notif-bell-wrap" id="notifBellBtn" onclick="goToNotifications()" aria-label="Notifications" style="display:none;font-size:17px;">
+        🔔<span class="notif-bell-dot" id="userNotifDot"></span>
+      </button>
       <button class="nav-icon-btn" onclick="openWishlist()" aria-label="Wishlist">
         ♡<span class="nb" id="wishBadge">0</span>
       </button>
@@ -1371,6 +1426,7 @@ footer{padding-bottom:max(32px,env(safe-area-inset-bottom,16px));}
     <div class="ptabs">
       <button class="ptab active" onclick="showPTab('overview',this)">Overview</button>
       <button class="ptab" onclick="showPTab('orders',this)">Orders</button>
+      <button class="ptab" id="notifTab" onclick="showPTab('notifications',this)" style="position:relative;">Notifications<span class="notif-bell-dot" id="profileNotifDot" style="position:absolute;top:8px;right:8px;"></span></button>
       <button class="ptab" onclick="showPTab('wishlist',this)">Wishlist</button>
       <button class="ptab" onclick="showPTab('settings',this)">Settings</button>
     </div>
@@ -1380,6 +1436,15 @@ footer{padding-bottom:max(32px,env(safe-area-inset-bottom,16px));}
     </div>
     <div class="psec" id="ptab-orders">
       <div class="pcard"><h3 class="pcard-title">Order History</h3><div id="profileOrdersList"></div></div>
+    </div>
+    <div class="psec" id="ptab-notifications">
+      <div class="pcard">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+          <h3 class="pcard-title" style="margin-bottom:0;">Notifications</h3>
+          <button class="btn-ghost" style="font-size:9px;letter-spacing:.16em;padding:6px 12px;" onclick="clearAllNotifs()">Clear All</button>
+        </div>
+        <div id="notifList"></div>
+      </div>
     </div>
     <div class="psec" id="ptab-wishlist">
       <div class="pcard"><h3 class="pcard-title">My Wishlist</h3><div class="wl-grid" id="profileWishGrid"></div></div>
@@ -1815,14 +1880,49 @@ function attachListeners(){
 
   _db.ref('orders').on('value', snap => {
     const raw = snap.val();
+    const prev = [...(_cache.orders||[])];
     _cache.orders = raw ? Object.values(raw).sort((a,b)=>(b.placedAt||0)-(a.placedAt||0)) : [];
+
+    /* ── Admin notification dots ── */
     const unseen = _cache.orders.filter(o=>!o.seenByAdmin).length;
-    /* notification dots */
     ['newOrderDot','dashOrderDot'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display=unseen>0?'inline-block':'none'; });
     const nb=document.getElementById('navOrderCount'); if(nb) nb.textContent=_cache.orders.length;
     const db=document.getElementById('d-orders'); if(db) db.textContent=_cache.orders.length;
     if(document.getElementById('sec-orders')?.classList.contains('active')) renderOrdersAdmin();
     if(document.getElementById('adminView')?.classList.contains('active'))  updateAdminDashboard();
+
+    /* ── User notification: detect when admin confirms THIS user's order ── */
+    if(currentUser) {
+      _cache.orders.forEach(order => {
+        if(order.email !== currentUser.email) return;
+        const prevOrder = prev.find(p=>p.id===order.id);
+        /* Fire notification if status changed TO confirmed/paid/delivered */
+        const notifyStatuses = ['confirmed','paid','delivered'];
+        if(notifyStatuses.includes(order.status) && prevOrder && prevOrder.status !== order.status) {
+          const msgs = {
+            confirmed: `Order ${order.id} has been confirmed! 🎉`,
+            paid:      `Payment for order ${order.id} has been verified! ✓`,
+            delivered: `Order ${order.id} has been delivered! 📦`
+          };
+          showConfirmBanner(msgs[order.status] || `Order ${order.id} updated to: ${order.status}`);
+          /* Save notification to localStorage so it persists if user refreshes */
+          const notifs = LS.get('userNotifs') || [];
+          notifs.unshift({ orderId:order.id, status:order.status, msg:msgs[order.status], ts:Date.now(), seen:false });
+          LS.set('userNotifs', notifs.slice(0,20)); /* keep last 20 */
+        }
+        /* Sync order status into currentUser.orders for profile display */
+        const localOrder = (currentUser.orders||[]).find(o=>o.id===order.id);
+        if(localOrder && localOrder.status !== order.status) {
+          localOrder.status = order.status;
+        }
+      });
+      /* Re-render profile orders tab if open */
+      if(document.getElementById('profileView')?.classList.contains('active')) {
+        renderProfileOrders();
+      }
+      /* Update notification bell */
+      updateNotifBell();
+    }
   });
 }
 
@@ -1934,6 +2034,9 @@ function doUserLogin(){
   LS.set('session', user.email);
   showView('shop'); showToast(`Welcome back, ${user.firstName}!`);
   updateMenuFooter(); updateCartBadge(); updateWishBadge();
+  const nb=document.getElementById('notifBellBtn'); if(nb) nb.style.display='inline-flex';
+  checkPendingNotifs();
+  setTimeout(checkPendingNotifs, 1200); /* show any pending order confirmations */
 }
 document.getElementById('loginPassword').addEventListener('keydown',e=>{ if(e.key==='Enter') doUserLogin(); });
 
@@ -1960,6 +2063,7 @@ function doUserLogout(){
   saveUserData(); currentUser=null; cart=[]; wishlist=[];
   LS.set('session', null);
   updateMenuFooter(); updateCartBadge(); updateWishBadge();
+  const nb=document.getElementById('notifBellBtn'); if(nb) nb.style.display='none';
   showView('shop'); showToast('Signed out successfully');
 }
 
@@ -2058,76 +2162,127 @@ function handleCheckout(){
   if(!currentUser){ closeCart(); showView('login'); return; }
   if(!cart.length){ showToast('Your cart is empty'); return; }
   closeCart();
-  _deliveryMode='pickup'; _paymentMethod='card';
-  renderCheckoutItems();
-  selectDelivery('pickup');
-  selectPayment('card');
-  loadTransferDetails();
-  document.getElementById('checkoutOverlay').classList.add('open');
+  coGoStep(1);
+  /* populate delivery cost label */
+  const s=getSettings(), cur=s.currency||'€';
+  const fee=parseFloat(s.deliveryFee)||0;
+  const lbl=document.getElementById('deliveryCostLabel');
+  if(lbl) lbl.textContent=fee>0?`+${cur} ${fee.toLocaleString()}`:'Free';
+  /* reset delivery selection */
+  document.getElementById('opt-pickup').classList.add('selected');
+  document.getElementById('opt-delivery').classList.remove('selected');
+  document.getElementById('addressFields').style.display='none';
+  _deliveryMode='pickup';
+  document.getElementById('checkoutModal').classList.add('open');
   document.body.style.overflow='hidden';
 }
-function closeCheckout(){ document.getElementById('checkoutOverlay').classList.remove('open'); document.body.style.overflow=''; }
+function closeCheckout(){
+  document.getElementById('checkoutModal').classList.remove('open');
+  document.body.style.overflow='';
+}
 
-function renderCheckoutItems(){
-  const products=getProducts(), cur=getSettings().currency||'€';
+/* ── Checkout step navigation ── */
+function coGoStep(n){
+  [1,2,3,4].forEach(i=>{
+    document.getElementById('co-step'+i)?.classList.toggle('active',i===n);
+    document.getElementById('cstep'+i)?.classList.toggle('active',i===n);
+  });
+}
+function selectDelivery(mode){
+  _deliveryMode=mode;
+  document.getElementById('opt-pickup').classList.toggle('selected',mode==='pickup');
+  document.getElementById('opt-delivery').classList.toggle('selected',mode==='delivery');
+  document.getElementById('addressFields').style.display=mode==='delivery'?'block':'none';
+}
+function selectPayTab(method,btn){
+  _paymentMethod=method;
+  document.querySelectorAll('.pay-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.pay-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('pay-'+method).classList.add('active');
+  if(method==='transfer') renderTransferBox();
+}
+function formatCard(el){ let v=el.value.replace(/\D/g,'').substring(0,16); el.value=v.replace(/(\d{4})/g,'$1 ').trim(); }
+function formatExpiry(el){ let v=el.value.replace(/\D/g,'').substring(0,4); if(v.length>2) v=v.slice(0,2)+' / '+v.slice(2); el.value=v; }
+
+function coGoStep2(){
+  /* Validate delivery address if home delivery */
+  if(_deliveryMode==='delivery'){
+    const name=document.getElementById('coName')?.value.trim();
+    const street=document.getElementById('coStreet')?.value.trim();
+    const city=document.getElementById('coCity')?.value.trim();
+    const phone=document.getElementById('coPhone')?.value.trim();
+    if(!name||!street||!city||!phone){ showToast('Please fill in all delivery details'); return; }
+  }
+  /* Build summary */
+  const products=getProducts(), s=getSettings(), cur=s.currency||'€';
+  const fee=_deliveryMode==='delivery'?(parseFloat(s.deliveryFee)||0):0;
   let sub=0;
-  document.getElementById('coItemsList').innerHTML=cart.map(item=>{
+  const itemsHtml=cart.map(item=>{
     const p=products.find(x=>x.id===item.productId); if(!p)return '';
     const line=p.price*item.qty; sub+=line;
     return `<div class="co-item">
       <div class="co-thumb">${p.image?`<img src="${p.image}" style="width:100%;height:100%;object-fit:cover;">`:p.name[0]}</div>
-      <div style="flex:1;min-width:0;"><div class="co-name">${p.name}</div><div class="co-qty">${p.brand||'Maison Noir'} · Qty ${item.qty}</div></div>
-      <div style="font-size:13px;flex-shrink:0;">${cur} ${line.toLocaleString()}</div>
+      <div style="flex:1;min-width:0;"><div class="co-name">${p.name}</div><div class="co-qty">${p.brand||'Maison Noir'} × ${item.qty}</div></div>
+      <div style="font-size:13px;">${cur} ${line.toLocaleString()}</div>
     </div>`;
   }).join('');
   _coSubtotal=sub;
-  updateCoTotals();
+  const grand=sub+fee;
+  document.getElementById('coSummary').innerHTML=`
+    ${itemsHtml}
+    <div class="co-totals" style="margin-top:14px;">
+      <div class="co-total-row"><span>Subtotal</span><span>${cur} ${sub.toLocaleString()}</span></div>
+      ${fee>0?`<div class="co-total-row"><span>🚚 Delivery Fee</span><span>${cur} ${fee.toLocaleString()}</span></div>`:''}
+      <div class="co-total-row grand"><span>Total</span><span>${cur} ${grand.toLocaleString()}</span></div>
+    </div>`;
+  renderTransferBox();
+  coGoStep(2);
 }
 
-function updateCoTotals(){
+function renderTransferBox(){
   const s=getSettings(), cur=s.currency||'€';
-  const fee=_deliveryMode==='home'?(parseFloat(s.deliveryFee)||0):0;
+  const fee=_deliveryMode==='delivery'?(parseFloat(s.deliveryFee)||0):0;
   const grand=_coSubtotal+fee;
-  document.getElementById('coSubtotal').textContent=`${cur} ${_coSubtotal.toLocaleString()}`;
-  document.getElementById('coDeliveryFee').textContent=`${cur} ${fee.toLocaleString()}`;
-  document.getElementById('coDeliveryRow').style.display=(_deliveryMode==='home'&&fee>0)?'flex':'none';
-  document.getElementById('coGrandTotal').textContent=`${cur} ${grand.toLocaleString()}`;
-  const ta=document.getElementById('tfAmount'); if(ta) ta.textContent=`${cur} ${grand.toLocaleString()}`;
+  document.getElementById('transferDetails').innerHTML=`
+    <div class="transfer-row"><span class="transfer-lbl">Bank</span><span class="transfer-val">${s.bankName||'Not set'}</span></div>
+    <div class="transfer-row"><span class="transfer-lbl">Account Name</span><span class="transfer-val">${s.bankHolder||'Not set'}</span></div>
+    <div class="transfer-row">
+      <span class="transfer-lbl">Account Number</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="transfer-val" id="tfAccNum">${s.bankAccount||'Not set'}</span>
+        <button class="transfer-copy" onclick="navigator.clipboard?.writeText(document.getElementById('tfAccNum').textContent).then(()=>showToast('Copied!'))">Copy</button>
+      </div>
+    </div>
+    <div class="transfer-row"><span class="transfer-lbl">Amount</span><span class="transfer-val" style="color:var(--gold);font-family:'Cormorant Garamond',serif;font-size:20px;">${cur} ${grand.toLocaleString()}</span></div>`;
 }
 
-function selectDelivery(mode){
-  _deliveryMode=mode;
-  document.getElementById('pickupBtn').classList.toggle('active',mode==='pickup');
-  document.getElementById('deliveryBtn').classList.toggle('active',mode==='home');
-  const df=document.getElementById('deliveryFields'); if(df) df.style.display=mode==='home'?'block':'none';
-  updateCoTotals();
-}
-
-function selectPayment(method){
-  _paymentMethod=method;
-  ['card','transfer','cash'].forEach(m=>{ const el=document.getElementById('pm-'+m); if(el) el.classList.toggle('selected',m===method); });
-  const cf=document.getElementById('cardFields'), tf=document.getElementById('transferFields'), cashf=document.getElementById('cashFields');
-  if(cf) cf.style.display=method==='card'?'block':'none';
-  if(tf) tf.style.display=method==='transfer'?'block':'none';
-  if(cashf) cashf.style.display=method==='cash'?'block':'none';
-}
-
-function loadTransferDetails(){
+function coGoStep3(){
+  /* Validate card if card payment */
+  if(_paymentMethod==='card'){
+    const num=(document.getElementById('cardNumber')?.value||'').replace(/\s/g,'');
+    const exp=document.getElementById('cardExpiry')?.value||'';
+    const cvv=document.getElementById('cardCvv')?.value||'';
+    const name=document.getElementById('cardName')?.value.trim()||'';
+    if(num.length<15||!exp||cvv.length<3||!name){ showToast('Please complete all card details'); return; }
+  }
   const s=getSettings(), cur=s.currency||'€';
-  const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
-  set('tfBank',    s.bankName    ||'Not configured — set in Admin Settings');
-  set('tfAccName', s.bankHolder  ||'Not configured');
-  set('tfAccNum',  s.bankAccount ||'Not configured');
-  set('tfAmount',  `${cur} ${_coSubtotal.toLocaleString()}`);
+  const fee=_deliveryMode==='delivery'?(parseFloat(s.deliveryFee)||0):0;
+  const grand=_coSubtotal+fee;
+  const payLabels={card:'💳 Card Payment',transfer:'🏦 Bank Transfer',cash:'💵 Pay on Delivery'};
+  const delivLabel=_deliveryMode==='delivery'
+    ?`🚚 Home Delivery — ${[document.getElementById('coStreet')?.value,document.getElementById('coCity')?.value,document.getElementById('coState')?.value].filter(Boolean).join(', ')}`
+    :'🏪 Store Pickup';
+  document.getElementById('coConfirmSummary').innerHTML=`
+    <div class="co-totals">
+      <div class="co-total-row"><span>Delivery</span><span style="font-size:11px;">${delivLabel}</span></div>
+      <div class="co-total-row"><span>Payment</span><span>${payLabels[_paymentMethod]||_paymentMethod}</span></div>
+      ${fee>0?`<div class="co-total-row"><span>Delivery Fee</span><span>${cur} ${fee.toLocaleString()}</span></div>`:''}
+      <div class="co-total-row grand"><span>Total to Pay</span><span>${cur} ${grand.toLocaleString()}</span></div>
+    </div>
+    <button class="btn-primary full" style="margin-top:16px;" onclick="placeOrder()"><span>✓ Confirm &amp; Place Order</span></button>`;
+  coGoStep(3);
 }
-
-function copyAccNum(){
-  const num=document.getElementById('tfAccNum')?.textContent||'';
-  navigator.clipboard?.writeText(num).then(()=>showToast('Account number copied!'));
-}
-
-function fmtCard(el){ let v=el.value.replace(/\D/g,'').substring(0,16); el.value=v.replace(/(\d{4})/g,'$1 ').trim(); }
-function fmtExpiry(el){ let v=el.value.replace(/\D/g,'').substring(0,4); if(v.length>2)v=v.slice(0,2)+'/'+v.slice(2); el.value=v; }
 
 function placeOrder(){
   if(!currentUser){ closeCheckout(); showView('login'); return; }
@@ -2147,7 +2302,7 @@ function placeOrder(){
     if(num.length<15||!exp||cvv.length<3||!name){ showToast('Please complete all card details'); return; }
   }
   const s=getSettings(), cur=s.currency||'€';
-  const fee=_deliveryMode==='home'?(parseFloat(s.deliveryFee)||0):0;
+  const fee=_deliveryMode==='delivery'?(parseFloat(s.deliveryFee)||0):0;
   const grand=_coSubtotal+fee;
   const products=getProducts();
   const orderId='ORD'+Date.now();
@@ -2156,16 +2311,17 @@ function placeOrder(){
     id:orderId, date:orderDate, placedAt:Date.now(),
     customer:`${currentUser.firstName} ${currentUser.lastName}`,
     email:currentUser.email,
-    phone:_deliveryMode==='home'?(document.getElementById('coPhone')?.value.trim()||''):(currentUser.phone||''),
+    phone:_deliveryMode==='delivery'?(document.getElementById('coPhone')?.value.trim()||''):(currentUser.phone||''),
     items:cart.map(i=>{ const p=products.find(x=>x.id===i.productId); return {productId:i.productId,name:p?.name||'',qty:i.qty,price:p?.price||0}; }),
     itemCount:cart.reduce((s,i)=>s+i.qty,0),
     subtotal:_coSubtotal, deliveryFee:fee, total:grand,
     delivery:_deliveryMode,
-    address:_deliveryMode==='home'
-      ?[document.getElementById('coAddress')?.value.trim(),document.getElementById('coCity')?.value.trim(),document.getElementById('coState')?.value.trim()].filter(Boolean).join(', ')
+    address:_deliveryMode==='delivery'
+      ?[document.getElementById('coStreet')?.value.trim(),document.getElementById('coCity')?.value.trim(),document.getElementById('coState')?.value.trim(),document.getElementById('coPostal')?.value.trim()].filter(Boolean).join(', ')
       :'',
+    notes:document.getElementById('coNotes')?.value.trim()||'',
     payment:_paymentMethod,
-    status:'pending', seenByAdmin:false
+    status:'pending', seenByAdmin:false, confirmedByAdmin:false
   };
   const btn=document.getElementById('placeOrderBtn');
   btn.disabled=true; btn.textContent='Placing order…';
@@ -2174,11 +2330,18 @@ function placeOrder(){
       if(!currentUser.orders) currentUser.orders=[];
       currentUser.orders.push({id:orderId,date:orderDate,items:[...cart],total:grand,status:'pending'});
       cart=[]; saveUserData(); updateCartBadge();
-      closeCheckout();
-      btn.disabled=false; btn.textContent='Place Order →';
-      showToast('🎉 Order placed! We\'ll be in touch shortly.');
+      btn.disabled=false; btn.textContent='✓ Confirm & Place Order';
+      /* Show success screen inside modal */
+      document.getElementById('successOrderId').textContent=orderId;
+      document.getElementById('successMsg').textContent=
+        _paymentMethod==='transfer'
+          ?'Transfer the exact amount using your Order ID as reference. We will confirm once payment is received.'
+          :_paymentMethod==='cash'
+          ?'Your order is reserved. Pay cash or POS when you receive or pick up your items.'
+          :'Payment details received. Admin will confirm your order shortly.';
+      coGoStep(4);
     })
-    .catch(e=>{ btn.disabled=false; btn.textContent='Place Order →'; showToast('Error: '+e.message); });
+    .catch(e=>{ btn.disabled=false; btn.textContent='✓ Confirm & Place Order'; showToast('Error: '+e.message); });
 }
 
 /* ════════════════════════════════════════════════════════
@@ -2317,19 +2480,7 @@ function renderProfile(){
   } else {
     document.getElementById('profileCartSummary').innerHTML=`<div class="empty-msg" style="padding:24px;"><p>Cart is empty</p></div>`;
   }
-  const orders=u.orders||[];
-  document.getElementById('profileOrdersList').innerHTML=orders.length
-    ?[...orders].reverse().map(o=>{
-        const items=(o.items||[]).map(i=>{ const p=products.find(x=>x.id===i.productId); return p?`${p.name} ×${i.qty}`:''; }).filter(Boolean).join(', ');
-        return `<div class="order-row">
-          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-            <span class="order-id">${o.id}</span><span class="order-date">${o.date}</span>
-          </div>
-          <div class="order-items">${items}</div>
-          <div class="order-total">${cur} ${Number(o.total).toLocaleString()}</div>
-        </div>`;
-      }).join('')
-    :`<div class="empty-msg"><p>No orders yet</p><small>Your order history will appear here</small></div>`;
+  renderProfileOrders();
   renderProfileWishlist();
   document.getElementById('editFirst').value=u.firstName||'';
   document.getElementById('editLast').value=u.lastName||'';
@@ -2352,9 +2503,56 @@ function renderProfileWishlist(){
 }
 function showPTab(name,btn){
   document.querySelectorAll('.psec').forEach(s=>s.classList.remove('active'));
-  document.getElementById('ptab-'+name).classList.add('active');
+  document.getElementById('ptab-'+name)?.classList.add('active');
   document.querySelectorAll('.ptab').forEach(t=>t.classList.remove('active'));
-  btn.classList.add('active');
+  if(btn) btn.classList.add('active');
+  if(name==='orders')        renderProfileOrders();
+  if(name==='notifications') renderNotifications();
+}
+function goToNotifications(){
+  showView('profile');
+  setTimeout(()=>{
+    const btn=document.getElementById('notifTab');
+    showPTab('notifications', btn);
+  }, 100);
+}
+function renderNotifications(){
+  const notifs = LS.get('userNotifs') || [];
+  const el = document.getElementById('notifList'); if(!el) return;
+  /* Mark all as seen */
+  const updated = notifs.map(n=>({...n,seen:true}));
+  LS.set('userNotifs', updated);
+  /* Hide dots */
+  ['userNotifDot','profileNotifDot'].forEach(id=>{ const d=document.getElementById(id); if(d) d.classList.remove('show'); });
+  if(!notifs.length){
+    el.innerHTML=`<div class="empty-msg"><p>No notifications yet</p><small>Order confirmations will appear here</small></div>`;
+    return;
+  }
+  const icons={confirmed:'✅',paid:'💰',delivered:'📦',pending:'⏳'};
+  el.innerHTML=notifs.map(n=>{
+    const ago = timeSince(n.ts);
+    return `<div style="display:flex;align-items:flex-start;gap:12px;padding:14px 0;border-bottom:1px solid rgba(244,241,237,.06);">
+      <div style="width:36px;height:36px;border-radius:50%;background:rgba(86,196,139,.12);border:1px solid rgba(86,196,139,.2);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;">${icons[n.status]||'📬'}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:12px;color:var(--white);margin-bottom:3px;">${n.msg||'Order update'}</div>
+        <div style="font-size:9px;color:rgba(244,241,237,.3);letter-spacing:.08em;">${ago}</div>
+      </div>
+      ${!n.seen?'<div style="width:7px;height:7px;border-radius:50%;background:var(--gold);flex-shrink:0;margin-top:5px;"></div>':''}
+    </div>`;
+  }).join('');
+}
+function clearAllNotifs(){
+  LS.set('userNotifs',[]);
+  renderNotifications();
+  showToast('Notifications cleared');
+}
+function timeSince(ts){
+  if(!ts) return '';
+  const s=Math.floor((Date.now()-ts)/1000);
+  if(s<60) return 'Just now';
+  if(s<3600) return Math.floor(s/60)+'m ago';
+  if(s<86400) return Math.floor(s/3600)+'h ago';
+  return Math.floor(s/86400)+'d ago';
 }
 function saveProfileSettings(){
   if(!currentUser)return;
@@ -2531,10 +2729,20 @@ function renderOrdersAdmin(){
           `<span style="padding:4px 10px;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:var(--radius);font-size:10px;">🏪 Store Pickup</span>`}
         </div>
       </div>
-      <div class="aoc-actions">
-        <button class="aoc-action-btn s-pending" onclick="setOrderStatus('${o.id}','pending')">⏳ Pending</button>
-        <button class="aoc-action-btn s-paid"    onclick="setOrderStatus('${o.id}','paid')">✓ Paid</button>
-        <button class="aoc-action-btn s-delivered" onclick="setOrderStatus('${o.id}','delivered')">📦 Delivered</button>
+      <div class="aoc-actions" style="display:flex;flex-direction:column;">
+        ${o.status!=='confirmed'&&o.status!=='delivered'?`
+          <button onclick="confirmPayment('${o.id}')"
+            style="width:100%;padding:14px;border:none;background:var(--green);color:#fff;font-size:10px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;border-bottom:1px solid var(--border);">
+            ✅ Confirm Payment — Notify Customer
+          </button>`:`
+          <div style="padding:12px 16px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--green);background:rgba(86,196,139,.06);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px;">
+            ✓ Payment confirmed — customer notified
+          </div>`}
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;">
+          <button class="aoc-action-btn s-pending"   onclick="setOrderStatus('${o.id}','pending')">⏳ Pending</button>
+          <button class="aoc-action-btn s-paid"      onclick="setOrderStatus('${o.id}','paid')">💰 Paid</button>
+          <button class="aoc-action-btn s-delivered" onclick="setOrderStatus('${o.id}','delivered')">📦 Delivered</button>
+        </div>
       </div>
     </div>`;
   }).join('');
@@ -2544,11 +2752,21 @@ function setOrderFilter(f,btn){
   document.querySelectorAll('#orderFilterBar .cf').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active'); renderOrdersAdmin();
 }
-function setOrderStatus(orderId,status){
-  fbUpdate('orders/'+orderId,{status,seenByAdmin:true})
-    .then(()=>showToast('Order marked as '+status))
+function setOrderStatus(orderId, status){
+  const updates = { status, seenByAdmin:true };
+  if(status==='confirmed') updates.confirmedAt = Date.now();
+  fbUpdate('orders/'+orderId, updates)
+    .then(()=>{
+      const labels={pending:'Pending ⏳',confirmed:'Payment confirmed — customer notified ✓',paid:'Marked as paid 💰',delivered:'Marked as delivered 📦'};
+      showToast(labels[status]||('Marked as '+status));
+    })
     .catch(e=>showToast('Error: '+e.message));
 }
+
+function confirmPayment(orderId){
+  setOrderStatus(orderId, 'confirmed');
+}
+
 function markOrdersSeen(){
   const unseen=(_cache.orders||[]).filter(o=>!o.seenByAdmin);
   if(!unseen.length||!_db) return;
@@ -2701,6 +2919,89 @@ function checkAdminHash(){
 }
 window.addEventListener('hashchange',checkAdminHash);
 
+/* ════════════════════════════════════════════════════════
+   USER NOTIFICATIONS
+════════════════════════════════════════════════════════ */
+let _confirmBannerTimer = null;
+
+function showConfirmBanner(msg){
+  const banner = document.getElementById('confirmBanner');
+  const msgEl  = document.getElementById('confirmBannerMsg');
+  if(!banner||!msgEl) return;
+  msgEl.textContent = msg;
+  banner.classList.add('show');
+  clearTimeout(_confirmBannerTimer);
+  _confirmBannerTimer = setTimeout(()=>banner.classList.remove('show'), 8000);
+}
+
+function dismissConfirmBanner(){
+  document.getElementById('confirmBanner')?.classList.remove('show');
+  clearTimeout(_confirmBannerTimer);
+}
+
+function updateNotifBell(){
+  const notifs = LS.get('userNotifs') || [];
+  const unread = notifs.filter(n=>!n.seen).length;
+  ['userNotifDot','profileNotifDot'].forEach(id=>{
+    const dot=document.getElementById(id);
+    if(dot) dot.classList.toggle('show', unread>0);
+  });
+}
+
+function renderProfileOrders(){
+  const u = currentUser; if(!u) return;
+  const orders = u.orders || [];
+  const products = getProducts();
+  const cur = getSettings().currency||'€';
+  const el = document.getElementById('profileOrdersList'); if(!el) return;
+
+  if(!orders.length){
+    el.innerHTML=`<div class="empty-msg"><p>No orders yet</p><small>Your order history will appear here</small></div>`;
+    return;
+  }
+
+  /* Merge status from Firebase cache into local orders */
+  orders.forEach(o=>{
+    const live = (_cache.orders||[]).find(x=>x.id===o.id);
+    if(live) o.status = live.status;
+  });
+
+  el.innerHTML=[...orders].reverse().map(o=>{
+    const items=(o.items||[]).map(i=>{ const p=products.find(x=>x.id===i.productId); return p?`${p.name} ×${i.qty}`:''; }).filter(Boolean).join(', ');
+    const status = o.status||'pending';
+    const statusLabels = { pending:'Pending', confirmed:'Confirmed ✓', paid:'Paid ✓', delivered:'Delivered 📦' };
+    return `<div class="order-row">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px;">
+        <span class="order-id">${o.id}</span>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span class="order-date">${o.date}</span>
+          <span class="order-status-badge ${status}">${statusLabels[status]||status}</span>
+        </div>
+      </div>
+      <div class="order-items">${items}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
+        <div class="order-total">${cur} ${Number(o.total).toLocaleString()}</div>
+        ${status==='confirmed'?`<div style="font-size:10px;color:var(--green);display:flex;align-items:center;gap:4px;">✓ Admin confirmed payment</div>`:''}
+        ${status==='delivered'?`<div style="font-size:10px;color:var(--blue);display:flex;align-items:center;gap:4px;">📦 Delivered</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* Check on login if there are pending notifications to show */
+function checkPendingNotifs(){
+  const notifs = LS.get('userNotifs') || [];
+  const unseen = notifs.filter(n=>!n.seen);
+  if(unseen.length>0){
+    /* Show the most recent one */
+    showConfirmBanner(unseen[0].msg);
+    /* Mark all as seen */
+    notifs.forEach(n=>n.seen=true);
+    LS.set('userNotifs', notifs);
+  }
+  updateNotifBell();
+}
+
 /* ── Password show/hide ── */
 function togglePw(eyeBtn){
   const input=eyeBtn.previousElementSibling;
@@ -2729,7 +3030,11 @@ function handleSubscribe(e){ e.preventDefault(); e.target.querySelector('input')
 ════════════════════════════════════════════════════════ */
 initData().then(()=>{
   /* Restore user session UI */
-  if(currentUser){ updateMenuFooter(); updateCartBadge(); updateWishBadge(); }
+  if(currentUser){
+    updateMenuFooter(); updateCartBadge(); updateWishBadge();
+    const nb=document.getElementById('notifBellBtn'); if(nb) nb.style.display='inline-flex';
+    setTimeout(checkPendingNotifs, 1500); /* check for order confirmations received while offline */
+  }
   /* Restore admin session */
   const adminSess=LS.get('adminSession');
   if(adminSess){
