@@ -905,6 +905,22 @@ footer{background:#050505;padding:52px 24px 32px;border-top:1px solid var(--bord
 .ucs-val{font-family:'Playfair Display',serif;font-size:20px;font-weight:300;}
 .ucs-lbl{font-size:8px;letter-spacing:.18em;text-transform:uppercase;color:rgba(244,241,237,.3);}
 
+
+/* ── Forgot Password modal ── */
+.fp-overlay{position:fixed;inset:0;background:rgba(5,5,5,.88);z-index:950;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .28s;backdrop-filter:blur(8px);}
+.fp-overlay.open{opacity:1;pointer-events:all;}
+.fp-box{background:var(--dark);border:1px solid var(--border);border-radius:14px;width:100%;max-width:400px;padding:32px 28px;transform:translateY(16px);transition:transform .32s cubic-bezier(.34,1.1,.64,1);}
+.fp-overlay.open .fp-box{transform:translateY(0);}
+.fp-title{font-family:'Playfair Display',serif;font-size:22px;font-weight:400;margin-bottom:6px;text-align:center;}
+.fp-sub{font-size:11px;color:rgba(244,241,237,.45);text-align:center;margin-bottom:22px;line-height:1.7;}
+.fp-step{display:none;} .fp-step.active{display:block;}
+.fp-code-inputs{display:flex;gap:10px;justify-content:center;margin:18px 0;}
+.fp-code-input{width:48px;height:54px;text-align:center;font-size:22px;font-weight:600;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:var(--radius);color:var(--white);transition:border-color .2s;-webkit-appearance:none;}
+.fp-code-input:focus{outline:none;border-color:var(--gold);}
+.fp-resend{font-size:10px;color:rgba(244,241,237,.35);text-align:center;margin-top:10px;}
+.fp-resend a{color:var(--gold);cursor:pointer;}
+.fp-success-ico{font-size:44px;text-align:center;margin-bottom:12px;}
+
 /* MODAL */
 .modal-overlay{position:fixed;inset:0;background:rgba(5,5,5,.9);z-index:800;display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .3s;backdrop-filter:blur(6px);}
 .modal-overlay.open{opacity:1;pointer-events:all;}
@@ -1215,7 +1231,7 @@ footer{padding-bottom:max(32px,env(safe-area-inset-bottom,16px));}
         ♡<span class="nb" id="wishBadge">0</span>
       </button>
       <button class="nav-icon-btn gold-btn" onclick="openCart()" aria-label="Cart">
-        ⊕<span class="nb on" id="cartBadge">0</span>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg><span class="nb on" id="cartBadge">0</span>
       </button>
     </div>
   </header>
@@ -1361,7 +1377,8 @@ footer{padding-bottom:max(32px,env(safe-area-inset-bottom,16px));}
     <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="loginEmail" type="email" inputmode="email" autocomplete="email" placeholder="your@email.com"></div>
     <div class="form-group"><label class="form-label">Password</label><div class="pw-wrap"><input class="form-input" id="loginPassword" type="password" placeholder="Enter password"><button type="button" class="pw-eye" onclick="togglePw(this)">👁</button></div></div>
     <div class="auth-err" id="loginError">Invalid email or password.</div>
-    <button class="btn-primary full" style="margin-top:8px;" onclick="doUserLogin()"><span>Sign In</span></button>
+    <div style="text-align:right;margin-top:-4px;margin-bottom:12px;"><a onclick="openForgotPw()" style="font-size:11px;color:var(--gold);cursor:pointer;letter-spacing:.04em;">Forgot password?</a></div>
+    <button class="btn-primary full" onclick="doUserLogin()"><span>Sign In</span></button>
     <div class="auth-switch">No account? <a onclick="showView('register')">Create one</a></div>
     <button class="back-link" onclick="showView('shop')">← Back to Store</button>
   </div>
@@ -1409,7 +1426,7 @@ footer{padding-bottom:max(32px,env(safe-area-inset-bottom,16px));}
   <div class="profile-topbar">
     <span class="profile-topbar-logo" onclick="showView('shop')">MAISON NOIR</span>
     <div class="profile-topbar-btns">
-      <button class="admin-tbtn" onclick="openCart()">⊕ <span id="profileCartBadge">0</span></button>
+      <button class="admin-tbtn" onclick="openCart()" style="display:flex;align-items:center;gap:5px;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg><span id="profileCartBadge">0</span></button>
       <button class="admin-tbtn" onclick="showView('shop')">← Store</button>
       <button class="admin-tbtn" style="color:var(--red);border-color:rgba(224,92,92,.3);" onclick="doUserLogout()">Sign Out</button>
     </div>
@@ -1720,7 +1737,75 @@ footer{padding-bottom:max(32px,env(safe-area-inset-bottom,16px));}
   </div>
 </div>
 
+
+<!-- ══════════════════════ FORGOT PASSWORD MODAL ══════════════════════ -->
+<div class="fp-overlay" id="fpOverlay">
+  <div class="fp-box">
+
+    <!-- Step 1: Enter email -->
+    <div class="fp-step active" id="fp-step1">
+      <div class="fp-title">Forgot Password?</div>
+      <div class="fp-sub">Enter your email address and we'll send you a 6-digit code to reset your password.</div>
+      <div class="form-group"><label class="form-label">Email Address</label><input class="form-input" id="fpEmail" type="email" inputmode="email" placeholder="your@email.com"></div>
+      <div class="auth-err" id="fpEmailErr">No account found with this email.</div>
+      <button class="btn-primary full" style="margin-top:14px;" onclick="fpSendCode()"><span id="fpSendBtnTxt">Send Reset Code</span></button>
+      <button class="continue-btn" onclick="closeForgotPw()" style="margin-top:8px;">← Back to Sign In</button>
+    </div>
+
+    <!-- Step 2: Enter code -->
+    <div class="fp-step" id="fp-step2">
+      <div class="fp-title">Enter Your Code</div>
+      <div class="fp-sub">We sent a 6-digit code to <strong id="fpEmailDisplay"></strong></div>
+      <div class="fp-code-inputs">
+        <input class="fp-code-input" maxlength="1" inputmode="numeric" oninput="fpCodeInput(this,0)" onkeydown="fpCodeKey(event,0)">
+        <input class="fp-code-input" maxlength="1" inputmode="numeric" oninput="fpCodeInput(this,1)" onkeydown="fpCodeKey(event,1)">
+        <input class="fp-code-input" maxlength="1" inputmode="numeric" oninput="fpCodeInput(this,2)" onkeydown="fpCodeKey(event,2)">
+        <input class="fp-code-input" maxlength="1" inputmode="numeric" oninput="fpCodeInput(this,3)" onkeydown="fpCodeKey(event,3)">
+        <input class="fp-code-input" maxlength="1" inputmode="numeric" oninput="fpCodeInput(this,4)" onkeydown="fpCodeKey(event,4)">
+        <input class="fp-code-input" maxlength="1" inputmode="numeric" oninput="fpCodeInput(this,5)" onkeydown="fpCodeKey(event,5)">
+      </div>
+      <div class="auth-err" id="fpCodeErr">Incorrect code. Please try again.</div>
+      <button class="btn-primary full" onclick="fpVerifyCode()"><span>Verify Code</span></button>
+      <div class="fp-resend">Didn't receive it? <a onclick="fpResend()">Resend code</a></div>
+      <button class="continue-btn" onclick="fpGoStep(1)" style="margin-top:4px;">← Change Email</button>
+    </div>
+
+    <!-- Step 3: New password -->
+    <div class="fp-step" id="fp-step3">
+      <div class="fp-title">Set New Password</div>
+      <div class="fp-sub">Choose a strong password for your account.</div>
+      <div class="form-group"><label class="form-label">New Password</label><div class="pw-wrap"><input class="form-input" id="fpNewPw" type="password" placeholder="At least 8 characters" oninput="checkPassStrength(this.value)"><button type="button" class="pw-eye" onclick="togglePw(this)">👁</button></div><div class="pass-bar" id="passStrength"></div></div>
+      <div class="form-group"><label class="form-label">Confirm Password</label><div class="pw-wrap"><input class="form-input" id="fpConfirmPw" type="password" placeholder="Repeat password"><button type="button" class="pw-eye" onclick="togglePw(this)">👁</button></div></div>
+      <div class="auth-err" id="fpPwErr">Passwords do not match.</div>
+      <button class="btn-primary full" style="margin-top:14px;" onclick="fpResetPassword()"><span>Reset Password</span></button>
+    </div>
+
+    <!-- Step 4: Success -->
+    <div class="fp-step" id="fp-step4">
+      <div class="fp-success-ico">✅</div>
+      <div class="fp-title">Password Reset!</div>
+      <div class="fp-sub">Your password has been updated. You can now sign in with your new password.</div>
+      <button class="btn-primary full" onclick="closeForgotPw();showView('login')"><span>Sign In Now</span></button>
+    </div>
+
+  </div>
+</div>
+
 <!-- Firebase Compat SDK -->
+<!-- EmailJS for password reset emails -->
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script>
+  /* ── EmailJS init ──
+     To enable real email delivery:
+     1. Create free account at emailjs.com
+     2. Add an Email Service → copy your Service ID  → replace 'service_maisonoir'
+     3. Create an Email Template with variables: {{to_email}}, {{reset_code}}, {{store_name}}
+        Copy your Template ID → replace 'template_resetpw'
+     4. Copy your Public Key below
+     Without configuration the code still works — it appears in the browser console.
+  */
+  (function(){ try{ emailjs.init({ publicKey: 'YOUR_PUBLIC_KEY' }); } catch(e){} })();
+</script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <style>
@@ -2160,7 +2245,7 @@ function renderCartDrawer(){
   const body=document.getElementById('cartBody'), foot=document.getElementById('cartFooter');
   const cur=getSettings().currency||'€';
   if(!cart.length){
-    body.innerHTML=`<div class="cart-empty-msg"><div class="ico">⊕</div><p>Cart is empty</p><small>Explore our collections</small></div>`;
+    body.innerHTML=`<div class="cart-empty-msg"><div class="ico" style="opacity:.25;"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg></div><p>Cart is empty</p><small>Explore our collections</small></div>`;
     foot.style.display='none'; return;
   }
   const products=getProducts(); let total=0;
@@ -3071,6 +3156,156 @@ function checkPendingNotifs(){
     LS.set('userNotifs', notifs);
   }
   updateNotifBell();
+}
+
+/* ════════════════════════════════════════════════════════
+   FORGOT PASSWORD
+════════════════════════════════════════════════════════ */
+let _fpCode = '', _fpEmail = '', _fpResendTimer = null;
+
+function openForgotPw(){
+  fpGoStep(1);
+  document.getElementById('fpEmail').value = '';
+  document.getElementById('fpEmailErr').classList.remove('show');
+  ['fpNewPw','fpConfirmPw'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('fpOverlay').classList.add('open');
+}
+function closeForgotPw(){
+  document.getElementById('fpOverlay').classList.remove('open');
+  clearTimeout(_fpResendTimer);
+}
+function fpGoStep(n){
+  [1,2,3,4].forEach(i=>{
+    document.getElementById('fp-step'+i)?.classList.toggle('active', i===n);
+  });
+}
+
+async function fpSendCode(){
+  const email = document.getElementById('fpEmail').value.trim().toLowerCase();
+  const errEl  = document.getElementById('fpEmailErr');
+  const btnTxt = document.getElementById('fpSendBtnTxt');
+  errEl.classList.remove('show');
+
+  if(!email || !email.includes('@')){ errEl.textContent='Please enter a valid email.'; errEl.classList.add('show'); return; }
+
+  /* Check if account exists in Firebase */
+  btnTxt.textContent = 'Checking…';
+  const key = email.replace(/[.#$[\]]/g,'_');
+  try {
+    const snap = await _db.ref('users/'+key).once('value');
+    if(!snap.exists()){
+      btnTxt.textContent = 'Send Reset Code';
+      errEl.textContent  = 'No account found with this email address.';
+      errEl.classList.add('show');
+      return;
+    }
+  } catch(e){
+    btnTxt.textContent = 'Send Reset Code';
+    errEl.textContent  = 'Error checking account. Please try again.';
+    errEl.classList.add('show');
+    return;
+  }
+
+  /* Generate 6-digit code */
+  _fpCode  = String(Math.floor(100000 + Math.random() * 900000));
+  _fpEmail = email;
+
+  /* Send via EmailJS */
+  btnTxt.textContent = 'Sending…';
+  try {
+    await emailjs.send('service_maisonoir', 'template_resetpw', {
+      to_email: email,
+      reset_code: _fpCode,
+      store_name: getSettings().storeName || 'Maison Noir'
+    });
+    btnTxt.textContent = 'Send Reset Code';
+    /* Show code step */
+    document.getElementById('fpEmailDisplay').textContent = email;
+    document.querySelectorAll('.fp-code-input').forEach(el=>el.value='');
+    document.getElementById('fpCodeErr').classList.remove('show');
+    fpGoStep(2);
+    document.querySelector('.fp-code-input').focus();
+    fpStartResendTimer();
+  } catch(e){
+    btnTxt.textContent = 'Send Reset Code';
+    /* EmailJS not configured — show code in console for testing, auto-advance */
+    console.log('%cReset code (dev mode): '+_fpCode, 'color:#c9a96e;font-size:18px;font-weight:bold;');
+    document.getElementById('fpEmailDisplay').textContent = email;
+    document.querySelectorAll('.fp-code-input').forEach(el=>el.value='');
+    document.getElementById('fpCodeErr').classList.remove('show');
+    fpGoStep(2);
+    document.querySelector('.fp-code-input').focus();
+    showToast('Code generated — check browser console (EmailJS not configured)');
+    fpStartResendTimer();
+  }
+}
+
+function fpStartResendTimer(){
+  let secs = 60;
+  const resendEl = document.querySelector('.fp-resend');
+  const tick = () => {
+    if(secs <= 0){ resendEl.innerHTML = 'Didn\'t receive it? <a onclick="fpResend()">Resend code</a>'; return; }
+    resendEl.innerHTML = `Resend code in <strong>${secs}s</strong>`;
+    secs--; _fpResendTimer = setTimeout(tick, 1000);
+  };
+  tick();
+}
+
+function fpResend(){
+  clearTimeout(_fpResendTimer);
+  fpGoStep(1);
+  document.getElementById('fpEmailErr').classList.remove('show');
+}
+
+function fpCodeInput(el, idx){
+  el.value = el.value.replace(/\D/g,'').slice(-1);
+  if(el.value && idx < 5){
+    document.querySelectorAll('.fp-code-input')[idx+1].focus();
+  }
+  /* Auto-verify when all 6 filled */
+  const all = [...document.querySelectorAll('.fp-code-input')].map(i=>i.value).join('');
+  if(all.length === 6) setTimeout(fpVerifyCode, 120);
+}
+
+function fpCodeKey(e, idx){
+  if(e.key === 'Backspace'){
+    const inputs = document.querySelectorAll('.fp-code-input');
+    if(!inputs[idx].value && idx > 0){ inputs[idx-1].focus(); inputs[idx-1].value=''; }
+  }
+}
+
+function fpVerifyCode(){
+  const entered = [...document.querySelectorAll('.fp-code-input')].map(i=>i.value).join('');
+  const errEl   = document.getElementById('fpCodeErr');
+  if(entered === _fpCode){
+    errEl.classList.remove('show');
+    fpGoStep(3);
+    document.getElementById('fpNewPw').focus();
+  } else {
+    errEl.classList.add('show');
+    document.querySelectorAll('.fp-code-input').forEach(el=>{ el.value=''; el.style.borderColor='var(--red)'; });
+    setTimeout(()=>document.querySelectorAll('.fp-code-input').forEach(el=>el.style.borderColor=''), 1000);
+    document.querySelector('.fp-code-input').focus();
+  }
+}
+
+async function fpResetPassword(){
+  const pw  = document.getElementById('fpNewPw').value;
+  const cpw = document.getElementById('fpConfirmPw').value;
+  const errEl = document.getElementById('fpPwErr');
+  errEl.classList.remove('show');
+  if(pw.length < 8){ errEl.textContent='Password must be at least 8 characters.'; errEl.classList.add('show'); return; }
+  if(pw !== cpw){    errEl.textContent='Passwords do not match.';                  errEl.classList.add('show'); return; }
+  const key = _fpEmail.replace(/[.#$[\]]/g,'_');
+  try {
+    await fbUpdate('users/'+key, { password: pw });
+    /* If this is the currently logged-in user, update local state too */
+    if(currentUser && currentUser.email === _fpEmail) currentUser.password = pw;
+    fpGoStep(4);
+  } catch(e){
+    errEl.textContent = 'Error saving password: '+e.message;
+    errEl.classList.add('show');
+  }
 }
 
 /* ── Password show/hide ── */
